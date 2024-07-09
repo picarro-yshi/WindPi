@@ -18,9 +18,9 @@ DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
 DATA_REFRESH_TIME = 2  # s
 
 ## Qt GUI
-from PyQt6.QtGui import QPixmap, QIcon, QAction
-from PyQt6.QtCore import Qt, QTimer, QSize
-from PyQt6.QtWidgets import (
+from PySide6.QtGui import QPixmap, QIcon, QAction  #PyQt6
+from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtWidgets import (
     QApplication,
     QTabWidget,
     QPushButton,
@@ -44,7 +44,9 @@ from PyQt6.QtWidgets import (
     QMainWindow,
 )
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+#from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PySide6.QtCore import QObject, QThread, Signal
+
 
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -57,8 +59,11 @@ global stoprun  # 1 stop thread, 0 keep running
 
 # Step 1: Create a worker class
 class Worker(QObject):
-    finished = pyqtSignal()
-    progress = pyqtSignal(int)
+    #finished = pyqtSignal()
+    #progress = pyqtSignal(int)
+    
+    finished = Signal()
+    progress = Signal(int)    
 
     def run(self):
         """Long-running task."""
@@ -159,18 +164,22 @@ class Window(QWidget):
         bottomLayout.addLayout(leftLayout)
         bottomLayout.addLayout(rightLayout)
 
+        self.Layout = QHBoxLayout()
+        #leftLayout.addLayout(self.Layout)
+
+        
         # time plot
         self.figure1 = plt.figure()
         self.canvas1 = FigureCanvas(self.figure1)
         self.toolbar1 = NavigationToolbar(self.canvas1, self)
         self.toolbar1.setFixedHeight(30)
 
-        self.Layout = QHBoxLayout()
         leftLayout.addWidget(self.canvas1)
         leftLayout.addWidget(self.toolbar1)
         leftLayout.addLayout(self.Layout)
 
         # windrose plot
+        
         self.figure2 = plt.figure()
         self.canvas2 = FigureCanvas(self.figure2)
         self.toolbar2 = NavigationToolbar(self.canvas2, self)
@@ -178,7 +187,7 @@ class Window(QWidget):
 
         rightLayout.addWidget(self.canvas2)
         rightLayout.addWidget(self.toolbar2)
-
+        
 
         self.createLayout1()
         self.createLayout2()
