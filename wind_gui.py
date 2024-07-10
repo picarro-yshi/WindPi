@@ -3,12 +3,7 @@ import platform
 import time
 import os
 import numpy as np
-
-opsystem = platform.system()  # 'Linux', 'Windows', 'Darwin'
-print(opsystem)
-
-import serial.tools.list_ports as ls
-print([p.device for p in ls.comports()])
+import pandas as pd
 
 import serial
 import socket
@@ -17,35 +12,70 @@ BAUDRATE = 19200
 DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
 DATA_REFRESH_TIME = 2  # s
 
-## Qt GUI
-from PySide6.QtGui import QPixmap, QIcon, QAction  #PyQt6
-from PySide6.QtCore import Qt, QTimer, QSize
-from PySide6.QtWidgets import (
-    QApplication,
-    QTabWidget,
-    QPushButton,
-    QMessageBox,
-    QTableWidget,
-    QTextEdit,
-    QLineEdit,
-    QToolButton,
-    QCheckBox,
-    QGridLayout,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QGroupBox,
-    QProgressBar,
-    QComboBox,
-    QTableWidgetItem,
-    QScrollArea,
-    QToolBar,
-    QMainWindow,
-)
+import serial.tools.list_ports as ls
+print([p.device for p in ls.comports()])
 
-#from PyQt6.QtCore import QObject, QThread, pyqtSignal
-from PySide6.QtCore import QObject, QThread, Signal
+opsystem = platform.system()  # 'Linux', 'Windows', 'Darwin'
+print(opsystem)
+print(platform.node())  # hostname
+## Qt GUI
+if 'rasp' in platform.node():  # on a raspberry pi, use PySide6
+    from PySide6.QtGui import QPixmap, QIcon, QAction
+    from PySide6.QtCore import Qt, QTimer, QSize
+    from PySide6.QtWidgets import (
+        QApplication,
+        QTabWidget,
+        QPushButton,
+        QMessageBox,
+        QTableWidget,
+        QTextEdit,
+        QLineEdit,
+        QToolButton,
+        QCheckBox,
+        QGridLayout,
+        QWidget,
+        QVBoxLayout,
+        QHBoxLayout,
+        QLabel,
+        QGroupBox,
+        QProgressBar,
+        QComboBox,
+        QTableWidgetItem,
+        QScrollArea,
+        QToolBar,
+        QMainWindow,
+    )
+    from PySide6.QtCore import QObject, QThread, Signal
+
+else:
+    # use PyQt6
+    from PyQt6.QtGui import QPixmap, QIcon, QAction
+    from PyQt6.QtCore import Qt, QTimer, QSize
+    from PyQt6.QtWidgets import (
+        QApplication,
+        QTabWidget,
+        QPushButton,
+        QMessageBox,
+        QTableWidget,
+        QTextEdit,
+        QLineEdit,
+        QToolButton,
+        QCheckBox,
+        QGridLayout,
+        QWidget,
+        QVBoxLayout,
+        QHBoxLayout,
+        QLabel,
+        QGroupBox,
+        QProgressBar,
+        QComboBox,
+        QTableWidgetItem,
+        QScrollArea,
+        QToolBar,
+        QMainWindow,
+    )
+    from PyQt6.QtCore import QObject, QThread
+    from PyQt6.QtCore import pyqtSignal as Signal
 
 
 from matplotlib import pyplot as plt
@@ -59,11 +89,9 @@ global stoprun  # 1 stop thread, 0 keep running
 
 # Step 1: Create a worker class
 class Worker(QObject):
-    #finished = pyqtSignal()
-    #progress = pyqtSignal(int)
-    
     finished = Signal()
-    progress = Signal(int)    
+    # progress = Signal(int)
+    progress = Signal(str)
 
     def run(self):
         """Long-running task."""
@@ -97,6 +125,7 @@ class Worker(QObject):
                 with open(data_path, "w") as f:
                     f.write("epoch_time, clock_time,U_speed_NS,V_speed_WE\n")
                 start_time = now
+                self.progress.emit(now_time)
 
             x = wind.readline().decode()
             y = x.split(',')
@@ -194,10 +223,10 @@ class Window(QWidget):
 
         self.setLayout(mainLayout)
 
-        self.timer_server = QTimer()
-        self.timer_server.setInterval(DATA_REFRESH_TIME * 1000)
-        # self.timer_server.timeout.connect(lambda: greeter_server.scale_plot(self))
-        self.timer_server.timeout.connect(self.run)
+        self.timer_plot = QTimer()
+        self.timer_plot.setInterval(DATA_REFRESH_TIME * 1000)
+        # self.timer_plot.timeout.connect(lambda: greeter_server.scale_plot(self))
+        self.timer_plot.timeout.connect(self.plot_wind)
 
 
 
@@ -231,18 +260,35 @@ class Window(QWidget):
         layout2.addWidget(label2)
 
 
-
     def createLayout2(self):
         pass
 
+    def plot_wind(self):
+        print('plot', self.filename)
 
-    def run(self):
-        print('ok')
+        # # time series
+        # df = pd.read_csv('20240708_101504.csv')
+        # # print(df)
+        #
+        # wind_u = df["NS_speed"][:240]
+        # wind_v = df["WE_speed"][:240]
+        # time = df["epoch_time"][:240]
+        # WS = np.sqrt(wind_u ** 2 + wind_v ** 2)
+        #
+        # plt.figure()
+        # plt.quiver(time, WS, wind_u, wind_v)
+        # plt.show()
+        #
+        #
+        # # windrose
+
+
 
 
     def reportProgress(self, n):
         # self.stepLabel.setText(f"Long-Running Step: {n}")
-        pass
+        self.filename = n
+        print(n)
 
     def runLongTask(self):
         # Step 2: Create a QThread object
@@ -273,7 +319,8 @@ class Window(QWidget):
 
     def start(self):
         self.runLongTask()
-        self.timer_server.start()
+        self.timer_plot.start()
+        self.filename = time.strftime("%Y%m%d_%H%M%S")
 
         self.StartButton.setEnabled(False)
         self.StopButton.setEnabled(True)
@@ -285,7 +332,7 @@ class Window(QWidget):
         global stoprun
         stoprun = 1
 
-        self.timer_server.stop()
+        self.timer_plot.stop()
         self.StartButton.setEnabled(True)
         self.StopButton.setEnabled(False)
         print('Record stopped.')
