@@ -8,7 +8,7 @@ import pandas as pd
 import serial
 
 # import socket
-# PORT = '/dev/ttyUSB2'
+PORT = '/dev/ttyUSB2'
 BAUDRATE = 19200
 DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
 DATA_REFRESH_TIME = 2  # s
@@ -146,6 +146,7 @@ class Window(QWidget):
         self.setGeometry(200, 200, 1200, 800)
         self.setWindowTitle("Wind")
         self.set_window_layout()
+        self.port = '/dev/ttyUSB2'
 
     def add_img(self, imgpath, label, x, y):  # image path, label, x scale, y scale
         p1 = QPixmap(imgpath)
@@ -459,9 +460,12 @@ class Window(QWidget):
 
     def port_detect(self):
         port = self.portComboBox.currentText()
-        wind = serial.Serial(port, BAUDRATE)
+        wind = serial.Serial(port, BAUDRATE, timeout = 5)
         x = wind.readline().decode()
-        print(x)
+        if x:
+            print(x)
+        else:
+            print("no connection")
 
 
 def main():
