@@ -6,14 +6,18 @@ import numpy as np
 import pandas as pd
 
 import serial
-import socket
-PORT = '/dev/ttyUSB2'
+
+# import socket
+# PORT = '/dev/ttyUSB2'
 BAUDRATE = 19200
 DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
 DATA_REFRESH_TIME = 2  # s
+PLOT_WINDOW = 5  # min
 
 import serial.tools.list_ports as ls
-print([p.device for p in ls.comports()])
+
+PORTLIST = [p.device for p in ls.comports()]
+print(PORTLIST)
 
 opsystem = platform.system()  # 'Linux', 'Windows', 'Darwin'
 print(opsystem)
@@ -44,6 +48,7 @@ if 'rasp' in platform.node():  # on a raspberry pi, use PySide6
         QScrollArea,
         QToolBar,
         QMainWindow,
+        QFileDialog,
     )
     from PySide6.QtCore import QObject, QThread, Signal
 
@@ -73,18 +78,16 @@ else:
         QScrollArea,
         QToolBar,
         QMainWindow,
+        QFileDialog,
     )
     from PyQt6.QtCore import QObject, QThread
     from PyQt6.QtCore import pyqtSignal as Signal
-
 
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 
-from windrose import plot_windrose
 from windrose import WindroseAxes
-
 
 import style
 
@@ -101,12 +104,6 @@ class Worker(QObject):
         """Long-running task."""
         global stoprun
         stoprun = 0
-
-        # for i in range(20):
-        #     if stoprun:
-        #         break
-        #     sleep(1)
-        #     self.progress.emit(i + 1)
 
         wind = serial.Serial(PORT, BAUDRATE)
         print(wind.name)
@@ -147,7 +144,7 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.setGeometry(200, 200, 1200, 800)
-        self.setWindowTitle("Picarro R&D")
+        self.setWindowTitle("Wind")
         self.set_window_layout()
 
     def add_img(self, imgpath, label, x, y):  # image path, label, x scale, y scale
@@ -164,8 +161,8 @@ class Window(QWidget):
         mainLayout = QVBoxLayout()
         topLayout = QHBoxLayout()
         bottomLayout = QHBoxLayout()
-        mainLayout.addLayout(topLayout, 10)
-        mainLayout.addLayout(bottomLayout, 90)
+        mainLayout.addLayout(topLayout, 5)
+        mainLayout.addLayout(bottomLayout, 95)
 
         logoLabel = QLabel()
         self.add_img("icons/picarro.png", logoLabel, 250, 100)
@@ -182,46 +179,58 @@ class Window(QWidget):
 
         leftLayout = QVBoxLayout()
         rightLayout = QVBoxLayout()
+        gap = QLabel("")
+        bottomLayout.addLayout(leftLayout)
+        bottomLayout.addWidget(gap)
+        bottomLayout.addLayout(rightLayout)
 
-        # box1 = QGroupBox("Local Computer")
-        # box1.setStyleSheet(style.box1())
-        # box1.setLayout(self.transferLayout)
+        figure1Layout = QVBoxLayout()
+        figure1Layout.setContentsMargins(20, 30, 20, 10)
+        box1 = QGroupBox("Time Series Plot")
+        box1.setStyleSheet(style.box1())
+        box1.setLayout(figure1Layout)
 
-        # box2 = QGroupBox("Local Instrument")
-        # box2.setStyleSheet(style.box2())
-        # box2.setLayout(self.instrumentLayout)
-        #
+        self.Layout = QVBoxLayout()
+        leftLayout.addWidget(box1)
+        leftLayout.addLayout(self.Layout)
+
+        figure2Layout = QVBoxLayout()
+        figure2Layout.setContentsMargins(20, 30, 20, 10)
+        box2 = QGroupBox("Wind Rose Plot")
+        box2.setStyleSheet(style.box2())
+        box2.setLayout(figure2Layout)
+        rightLayout.addWidget(box2)
+
         # mainLayout.addWidget(titleLabel, 5)
         # mainLayout.addWidget(box1, 45)
         # mainLayout.addWidget(box2, 50)
 
-        bottomLayout.addLayout(leftLayout)
-        bottomLayout.addLayout(rightLayout)
+        # leftLayout.addLayout(self.Layout)
 
-        self.Layout = QHBoxLayout()
-        #leftLayout.addLayout(self.Layout)
-
-        
         # time plot
         self.figure1 = plt.figure()
         self.canvas1 = FigureCanvas(self.figure1)
         self.toolbar1 = NavigationToolbar(self.canvas1, self)
         self.toolbar1.setFixedHeight(30)
 
-        leftLayout.addWidget(self.canvas1)
-        leftLayout.addWidget(self.toolbar1)
-        leftLayout.addLayout(self.Layout)
+        # gap1 = QLabel()
+        # figure1Layout.addWidget(gap1)
+        figure1Layout.addWidget(self.canvas1)
+        figure1Layout.addWidget(self.toolbar1)
+
+        # leftLayout.addLayout(self.Layout)
 
         # windrose plot
-        
+
         self.figure2 = plt.figure()
         self.canvas2 = FigureCanvas(self.figure2)
         self.toolbar2 = NavigationToolbar(self.canvas2, self)
         self.toolbar2.setFixedHeight(30)
 
-        rightLayout.addWidget(self.canvas2)
-        rightLayout.addWidget(self.toolbar2)
-        
+        # gap2 = QLabel()
+        # figure2Layout.addWidget(gap2)
+        figure2Layout.addWidget(self.canvas2)
+        figure2Layout.addWidget(self.toolbar2)
 
         self.createLayout1()
         self.createLayout2()
@@ -233,13 +242,50 @@ class Window(QWidget):
         # self.timer_plot.timeout.connect(lambda: greeter_server.scale_plot(self))
         self.timer_plot.timeout.connect(self.plot_wind)
 
-
-
     def createLayout1(self):
-        layout1 = QVBoxLayout()
-        layout2 = QVBoxLayout()
+        layout1 = QHBoxLayout()
+        layout2 = QHBoxLayout()
+        layout3 = QHBoxLayout()
+        layout4 = QHBoxLayout()
         self.Layout.addLayout(layout1)
         self.Layout.addLayout(layout2)
+        self.Layout.addLayout(layout3)
+        self.Layout.addLayout(layout4)
+
+        label11 = QLabel("Wind Velocity (m/s):")
+        label12 = QLabel("U-axis (NS):")
+        label12.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.uLabel = QLabel()
+        self.uLabel.setStyleSheet(style.grey1())
+        label13 = QLabel("V-axis (WE):")
+        label13.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.vLabel = QLabel()
+        self.vLabel.setStyleSheet(style.grey1())
+
+        layout1.addWidget(label11)
+        layout1.addWidget(label12)
+        layout1.addWidget(self.uLabel)
+        layout1.addWidget(label13)
+        layout1.addWidget(self.vLabel)
+
+        label21 = QLabel("Store Folder:")
+        self.folderLineEdit = QLineEdit("")
+        folderButton = QPushButton("Browse")
+        folderButton.clicked.connect(self.brouse_folder)
+        # folderButton.clicked.connect(lambda: func_tab3.browse_file(self))
+
+        layout2.addWidget(label21)
+        layout2.addWidget(self.folderLineEdit)
+        layout2.addWidget(folderButton)
+
+        layout5 = QVBoxLayout()
+        layout6 = QVBoxLayout()
+        layout7 = QVBoxLayout()
+
+        layout4.addLayout(layout7, 70)
+        layout4.addLayout(layout5, 15)
+        layout4.addLayout(layout6, 15)
 
         self.StartButton = QToolButton()
         self.StartButton.setIcon(QIcon("icons/start1.png"))
@@ -250,8 +296,8 @@ class Window(QWidget):
         label1 = QLabel("   Start")
         label1.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        layout1.addWidget(self.StartButton)
-        layout1.addWidget(label1)
+        layout5.addWidget(self.StartButton)
+        layout5.addWidget(label1)
 
         self.StopButton = QToolButton()
         self.StopButton.setIcon(QIcon("icons/stop1.png"))
@@ -261,9 +307,36 @@ class Window(QWidget):
         label2 = QLabel("   Stop")
         label2.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        layout2.addWidget(self.StopButton)
-        layout2.addWidget(label2)
+        layout6.addWidget(self.StopButton)
+        layout6.addWidget(label2)
 
+        label41 = QLabel("Data record speed: 4 Hz")
+        layout8 = QHBoxLayout()
+        # layout9 = QHBoxLayout()
+        self.hintLabel = QLabel()
+        self.hintLabel.setStyleSheet(style.grey1())
+
+        # layout7.addWidget(label41)
+        layout7.addLayout(layout8)
+        # layout7.addLayout(layout9)
+        layout7.addWidget(self.hintLabel)
+
+        label42 = QLabel("Anemometer port:")
+        self.portComboBox = QComboBox()
+        self.portComboBox.setFixedWidth(150)
+        self.portComboBox.addItems(PORTLIST)
+        portgetButton = QPushButton("Refresh")
+        portgetButton.clicked.connect(self.port_get)
+        portDetectButton = QPushButton("Detect")
+        portDetectButton.clicked.connect(self.port_detect)
+        self.portHintLabel = QLabel("  ")
+
+        # layout8.addWidget(label41)
+        layout8.addWidget(label42)
+        layout8.addWidget(self.portComboBox)
+        layout8.addWidget(portgetButton)
+        layout8.addWidget(portDetectButton)
+        layout8.addWidget(self.portHintLabel)
 
     def createLayout2(self):
         pass
@@ -281,24 +354,26 @@ class Window(QWidget):
         wind_v = df["V_speed_WE"]
         time = df["epoch_time"]
 
-        if df.shape[0] > 240:
-            wind_u = wind_u[-240:]
-            wind_v = wind_v[-240:]
-            time = time[-240:]
+        n = PLOT_WINDOW * 60
+        if df.shape[0] > n:
+            wind_u = wind_u[-n:]
+            wind_v = wind_v[-n:]
+            time = time[-n:]
 
         wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
 
-        # plt.figure()
-        # plt.quiver(time, wind_speed, wind_u, wind_v)
-        # plt.show()
-
         ax1.quiver(time, wind_speed, wind_u, wind_v)
+        ax1.set_xlabel("Clock Time")
+        ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
+
+
         self.canvas1.draw()
 
         # windrose
         self.figure2.clear()
-        #ax2 = self.figure2.add_subplot(111)
-        
+
+        # ax2 = self.figure2.add_subplot(111)
+
         def wind_uv_to_dir(U, V):
             """
             Calculates the wind direction from the u and v component of wind.
@@ -313,16 +388,14 @@ class Window(QWidget):
             return WDIR
 
         wind_dir = wind_uv_to_dir(wind_u, wind_v)
-        
-        rect=[0.1,0.2,0.8,0.7]
-        ax=WindroseAxes(self.figure2, rect)
+
+        rect = [0.1, 0.2, 0.8, 0.7]
+        ax = WindroseAxes(self.figure2, rect)
         self.figure2.add_axes(ax)
 
         ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
-        ax.set_legend(title = 'Wind Speed in m/s', bbox_to_anchor=(-0.1,-0.2))
+        ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.2))
         self.canvas2.draw()
-
-
 
     def reportProgress(self, n):
         # self.stepLabel.setText(f"Long-Running Step: {n}")
@@ -330,6 +403,8 @@ class Window(QWidget):
         # print(n)
 
     def runLongTask(self):
+        PORT = self.portComboBox.currentText()
+
         # Step 2: Create a QThread object
         self.thread = QThread()
         # Step 3: Create a worker object
@@ -355,7 +430,6 @@ class Window(QWidget):
         #     lambda: self.stepLabel.setText("Long-Running Step: 0")
         # )
 
-
     def start(self):
         self.runLongTask()
         self.timer_plot.start()
@@ -364,8 +438,6 @@ class Window(QWidget):
         self.StartButton.setEnabled(False)
         self.StopButton.setEnabled(True)
         print('Record started.')
-
-
 
     def stop(self):
         global stoprun
@@ -376,7 +448,20 @@ class Window(QWidget):
         self.StopButton.setEnabled(False)
         print('Record stopped.')
 
+    def brouse_folder(self):
+        folder = QFileDialog.getExistingDirectory()
+        self.folderLineEdit.setText(folder)
 
+    def port_get(self):
+        PORTLIST = [p.device for p in ls.comports()]
+        self.portComboBox.clear()
+        self.portComboBox.addItems(PORTLIST)
+
+    def port_detect(self):
+        port = self.portComboBox.currentText()
+        wind = serial.Serial(port, BAUDRATE)
+        x = wind.readline().decode()
+        print(x)
 
 
 def main():
@@ -390,10 +475,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
 # @author: Yilin Shi | 2024.4.25
 # shiyilin890@gmail.com
 # Bog the Fat Crocodile vvvvvvv
 #                       ^^^^^^^
-

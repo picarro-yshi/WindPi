@@ -6,7 +6,7 @@ pallet1 = ['#283044', '#78a1bb', '#ebf5ee', '#bfa89e', '#bfa89e']
 def headline1():
     return """
     font: bold;
-    font-size: 16px;
+    font-size: 24px;
     color: #283044
     """
 
