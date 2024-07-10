@@ -82,6 +82,10 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 
+from windrose import plot_windrose
+from windrose import WindroseAxes
+
+
 import style
 
 global stoprun  # 1 stop thread, 0 keep running
@@ -110,6 +114,7 @@ class Worker(QObject):
         start_time = time.time()
         now_time = time.strftime("%Y%m%d_%H%M%S")
         data_path = os.path.join(DATA_PATH, now_time + ".csv")
+        self.progress.emit(now_time)
         with open(data_path, "w") as f:
             f.write("epoch_time, clock_time,U_speed_NS,V_speed_WE\n")
 
@@ -272,14 +277,14 @@ class Window(QWidget):
 
         data_path = os.path.join(DATA_PATH, self.filename + ".csv")
         df = pd.read_csv(data_path)
-        wind_u = df["NS_speed"]
-        wind_v = df["WE_speed"]
+        wind_u = df["U_speed_NS"]
+        wind_v = df["V_speed_WE"]
         time = df["epoch_time"]
 
         if df.shape[0] > 240:
-            wind_u = wind_u[:240]
-            wind_v = wind_v[:240]
-            time = time[:240]
+            wind_u = wind_u[-240:]
+            wind_v = wind_v[-240:]
+            time = time[-240:]
 
         wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
 
@@ -291,6 +296,9 @@ class Window(QWidget):
         self.canvas1.draw()
 
         # windrose
+        self.figure2.clear()
+        #ax2 = self.figure2.add_subplot(111)
+        
         def wind_uv_to_dir(U, V):
             """
             Calculates the wind direction from the u and v component of wind.
@@ -305,14 +313,21 @@ class Window(QWidget):
             return WDIR
 
         wind_dir = wind_uv_to_dir(wind_u, wind_v)
+        
+        rect=[0.1,0.2,0.8,0.7]
+        ax=WindroseAxes(self.figure2, rect)
+        self.figure2.add_axes(ax)
 
+        ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
+        ax.set_legend(title = 'Wind Speed in m/s', bbox_to_anchor=(-0.1,-0.2))
+        self.canvas2.draw()
 
 
 
     def reportProgress(self, n):
         # self.stepLabel.setText(f"Long-Running Step: {n}")
         self.filename = n
-        print(n)
+        # print(n)
 
     def runLongTask(self):
         # Step 2: Create a QThread object
@@ -344,7 +359,7 @@ class Window(QWidget):
     def start(self):
         self.runLongTask()
         self.timer_plot.start()
-        self.filename = time.strftime("%Y%m%d_%H%M%S")
+        # self.filename = time.strftime("%Y%m%d_%H%M%S")
 
         self.StartButton.setEnabled(False)
         self.StopButton.setEnabled(True)
