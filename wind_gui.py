@@ -8,14 +8,13 @@ import pandas as pd
 import serial
 
 # import socket
-PORT = '/dev/ttyUSB2'
+# PORT = '/dev/ttyUSB2'
 BAUDRATE = 19200
-DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
+# DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
 DATA_REFRESH_TIME = 2  # s
 PLOT_WINDOW = 5  # min
 
 import serial.tools.list_ports as ls
-
 PORTLIST = [p.device for p in ls.comports()]
 print(PORTLIST)
 
@@ -104,6 +103,12 @@ class Worker(QObject):
         """Long-running task."""
         global stoprun
         stoprun = 0
+
+        with open("par1/port.txt", "r") as f:
+            PORT = f.read()
+
+        with open("par1/folder.txt", "r") as f:
+            DATA_PATH = f.read()
 
         wind = serial.Serial(PORT, BAUDRATE)
         print(wind.name)
@@ -202,34 +207,21 @@ class Window(QWidget):
         box2.setLayout(figure2Layout)
         rightLayout.addWidget(box2)
 
-        # mainLayout.addWidget(titleLabel, 5)
-        # mainLayout.addWidget(box1, 45)
-        # mainLayout.addWidget(box2, 50)
-
-        # leftLayout.addLayout(self.Layout)
-
         # time plot
         self.figure1 = plt.figure()
         self.canvas1 = FigureCanvas(self.figure1)
         self.toolbar1 = NavigationToolbar(self.canvas1, self)
         self.toolbar1.setFixedHeight(30)
 
-        # gap1 = QLabel()
-        # figure1Layout.addWidget(gap1)
         figure1Layout.addWidget(self.canvas1)
         figure1Layout.addWidget(self.toolbar1)
 
-        # leftLayout.addLayout(self.Layout)
-
         # windrose plot
-
         self.figure2 = plt.figure()
         self.canvas2 = FigureCanvas(self.figure2)
         self.toolbar2 = NavigationToolbar(self.canvas2, self)
         self.toolbar2.setFixedHeight(30)
 
-        # gap2 = QLabel()
-        # figure2Layout.addWidget(gap2)
         figure2Layout.addWidget(self.canvas2)
         figure2Layout.addWidget(self.toolbar2)
 
@@ -256,9 +248,9 @@ class Window(QWidget):
         label11 = QLabel("Wind Velocity (m/s):")
         label12 = QLabel("U-axis (NS):")
         label12.setAlignment(Qt.AlignmentFlag.AlignRight)
-
         self.uLabel = QLabel()
         self.uLabel.setStyleSheet(style.grey1())
+
         label13 = QLabel("V-axis (WE):")
         label13.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.vLabel = QLabel()
@@ -293,7 +285,6 @@ class Window(QWidget):
         self.StartButton.setIconSize(QSize(40, 40))
         self.StartButton.clicked.connect(self.start)
         # self.StartButton.clicked.connect(lambda: func_experiment.start_exp(self))
-        # self.StartButton.setEnabled(False)
         label1 = QLabel("   Start")
         label1.setAlignment(Qt.AlignmentFlag.AlignTop)
 
@@ -324,8 +315,15 @@ class Window(QWidget):
 
         label42 = QLabel("Anemometer port:")
         self.portComboBox = QComboBox()
-        self.portComboBox.setFixedWidth(150)
-        self.portComboBox.addItems(PORTLIST)
+        self.portComboBox.setFixedWidth(120)
+        self.port_get()
+        try:
+            with open("par1/port.txt", "r") as f:
+                temp = f.read()
+            self.portComboBox.setCurrentIndex(temp)
+        except:
+            print("load port failed.")
+
         portgetButton = QPushButton("Refresh")
         portgetButton.clicked.connect(self.port_get)
         portDetectButton = QPushButton("Detect")
@@ -342,66 +340,82 @@ class Window(QWidget):
     def createLayout2(self):
         pass
 
+    # real time display and plot
     def plot_wind(self):
-        # print('plot', self.filename)
-
-        # time series
-        self.figure1.clear()
-        ax1 = self.figure1.add_subplot(111)
-
-        data_path = os.path.join(DATA_PATH, self.filename + ".csv")
-        df = pd.read_csv(data_path)
-        wind_u = df["U_speed_NS"]
-        wind_v = df["V_speed_WE"]
-        time = df["epoch_time"]
-
-        n = PLOT_WINDOW * 60
-        if df.shape[0] > n:
-            wind_u = wind_u[-n:]
-            wind_v = wind_v[-n:]
-            time = time[-n:]
-
-        wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
-
-        ax1.quiver(time, wind_speed, wind_u, wind_v)
-        ax1.set_xlabel("Clock Time")
-        ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
 
 
-        self.canvas1.draw()
+        # time series plot
+        try:
+            self.figure1.clear()
+            ax1 = self.figure1.add_subplot(111)
 
-        # windrose
-        self.figure2.clear()
+            data_path = os.path.join(self.folder_path, self.filename + ".csv")
+            df = pd.read_csv(data_path)
+            wind_u = df["U_speed_NS"]
+            wind_v = df["V_speed_WE"]
+            time = df["epoch_time"]
 
-        # ax2 = self.figure2.add_subplot(111)
+            n = PLOT_WINDOW * 60
+            if df.shape[0] > n:
+                wind_u = wind_u[-n:]
+                wind_v = wind_v[-n:]
+                time = time[-n:]
 
-        def wind_uv_to_dir(U, V):
-            """
-            Calculates the wind direction from the u and v component of wind.
-            Takes into account the wind direction coordinates is different than the
-            trig unit circle coordinate. If the wind directin is 360 then returns zero
-            (by %360)
-            Inputs:
-              U = west/east direction (wind from the west is positive, from the east is negative)
-              V = south/noth direction (wind from the south is positive, from the north is negative)
-            """
-            WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
-            return WDIR
+            wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
+            ax1.quiver(time, wind_speed, wind_u, wind_v)
 
-        wind_dir = wind_uv_to_dir(wind_u, wind_v)
+            # axis label
+            ax1.set_xlabel("Clock Time: %s" % time.strftime("%Y-%m-%d"))
+            ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
 
-        rect = [0.1, 0.2, 0.8, 0.7]
-        ax = WindroseAxes(self.figure2, rect)
-        self.figure2.add_axes(ax)
+            # add mark
+            xx = list(time[::60])
+            xmak = []
+            for i in xx:
+                a = time.strftime('%H:%M', time.localtime(i))
+                xmak.append(a)
+            ax1.set_xticks(xx)
+            ax1.set_xticklabels(xmak, fontsize=8)
 
-        ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
-        ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.2))
-        self.canvas2.draw()
+            self.canvas1.draw()
+
+            # windrose plot
+            self.figure2.clear()
+
+            def wind_uv_to_dir(U, V):
+                """
+                Calculates the wind direction from the u and v component of wind.
+                Takes into account the wind direction coordinates is different than the
+                trig unit circle coordinate. If the wind directin is 360 then returns zero
+                (by %360)
+                Inputs:
+                  U = west/east direction (wind from the west is positive, from the east is negative)
+                  V = south/noth direction (wind from the south is positive, from the north is negative)
+                """
+                WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
+                return WDIR
+
+            wind_dir = wind_uv_to_dir(wind_u, wind_v)
+
+            rect = [0.1, 0.2, 0.8, 0.7]
+            ax = WindroseAxes(self.figure2, rect)
+            self.figure2.add_axes(ax)
+
+            ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
+            ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.2))
+            self.canvas2.draw()
+
+            # real time values
+            self.uLabel.setText(wind_u[-1])
+            self.vLabel.setText(wind_v[-1])
+
+            self.hintLabel.setText(self.startText + "Real time display...")
+
+        except:
+            self.hintLabel.setText(self.startText + "Failed to real time display.")
 
     def reportProgress(self, n):
-        # self.stepLabel.setText(f"Long-Running Step: {n}")
         self.filename = n
-        # print(n)
 
     def runLongTask(self):
         PORT = self.portComboBox.currentText()
@@ -421,24 +435,33 @@ class Window(QWidget):
         # Step 6: Start the thread
         self.thread.start()
 
-        # Final resets
-        # self.StartButton.setEnabled(False)
-        # self.StopButton.setEnabled(True)
-        # self.thread.finished.connect(
-        #     lambda: self.StartButton.setEnabled(True)
-        # )
-        # self.thread.finished.connect(
-        #     lambda: self.stepLabel.setText("Long-Running Step: 0")
-        # )
 
     def start(self):
-        self.runLongTask()
-        self.timer_plot.start()
-        # self.filename = time.strftime("%Y%m%d_%H%M%S")
+        # error check
+        tag = self.port_detect()
+        if not tag:
+            self.hintLabel.setText(" ! Anemometer is not connected.")
 
-        self.StartButton.setEnabled(False)
-        self.StopButton.setEnabled(True)
-        print('Record started.')
+        if tag:
+            self.folder_path = self.folderLineEdit.text()
+            if not os.path.isdir(self.folder_path):
+                self.hintLabel.setText("! Folder to store data does not exist.")
+                tag = 0
+
+        if tag:
+            try:
+                self.runLongTask()
+                self.timer_plot.start()
+
+                self.StartButton.setEnabled(False)
+                self.StopButton.setEnabled(True)
+                # print('Record started.')
+                self.startText = "Recording started at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S")
+                self.hintLabel.setText(self.startText)
+            except:
+                self.hintLabel.setText(" ! Error start.")
+
+
 
     def stop(self):
         global stoprun
@@ -447,7 +470,9 @@ class Window(QWidget):
         self.timer_plot.stop()
         self.StartButton.setEnabled(True)
         self.StopButton.setEnabled(False)
-        print('Record stopped.')
+        # print('Record stopped.')
+        self.hintLabel.setText("Recording stopped at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S"))
+
 
     def brouse_folder(self):
         folder = QFileDialog.getExistingDirectory()
@@ -463,9 +488,16 @@ class Window(QWidget):
         wind = serial.Serial(port, BAUDRATE, timeout = 5)
         x = wind.readline().decode()
         if x:
-            print(x)
+            with open("port.txt", "w") as f:
+                f.write(port)
+            self.hintLabel.setText("\u2713")
+            print("Anemometer connected.")
+            # print(x)
+            return 1
         else:
-            print("no connection")
+            self.hintLabel.setText("\u2713")
+            print("Anemometer NOT connected.")
+            return 0
 
 
 def main():
