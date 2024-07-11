@@ -166,9 +166,15 @@ class Window(QWidget):
 
     def set_window_layout(self):
         mainLayout = QVBoxLayout()
-        self.tabs = QTabWidget()
-        mainLayout.addWidget(self.tabs)
         self.setLayout(mainLayout)
+
+        topLayout = QHBoxLayout()
+        bottomLayout = QHBoxLayout()
+        mainLayout.addLayout(topLayout, 5)
+        mainLayout.addLayout(bottomLayout, 95)
+
+        self.tabs = QTabWidget()
+        bottomLayout.addWidget(self.tabs)
 
         self.tab1 = QWidget()
         self.tab2 = QWidget()
@@ -178,10 +184,8 @@ class Window(QWidget):
 
         tab1Layout = QVBoxLayout()
         self.tab1.setLayout(tab1Layout)
-        topLayout = QHBoxLayout()
-        bottomLayout = QHBoxLayout()
-        tab1Layout.addLayout(topLayout, 5)
-        tab1Layout.addLayout(bottomLayout, 95)
+
+
 
         logoLabel = QLabel()
         self.add_img("icons/picarro.png", logoLabel, 250, 100)
@@ -199,9 +203,9 @@ class Window(QWidget):
         leftLayout = QVBoxLayout()
         rightLayout = QVBoxLayout()
         gap = QLabel("")
-        bottomLayout.addLayout(leftLayout)
-        bottomLayout.addWidget(gap)
-        bottomLayout.addLayout(rightLayout)
+        tab1Layout.addLayout(leftLayout)
+        tab1Layout.addWidget(gap)
+        tab1Layout.addLayout(rightLayout)
 
         figure1Layout = QVBoxLayout()
         figure1Layout.setContentsMargins(20, 30, 20, 10)
