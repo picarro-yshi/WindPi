@@ -10,6 +10,8 @@ import serial
 # import socket
 # PORT = '/dev/ttyUSB2'
 BAUDRATE = 19200
+DATA_RATE = 4  # Hz
+
 # DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
 DATA_REFRESH_TIME = 2  # s
 PLOT_WINDOW = 5  # min
@@ -231,7 +233,7 @@ class Window(QWidget):
         self.setLayout(mainLayout)
 
         self.timer_plot = QTimer()
-        self.timer_plot.setInterval(DATA_REFRESH_TIME * 1000)
+        self.timer_plot.setInterval(DATA_REFRESH_TIME * DATA_RATE * 1000)
         # self.timer_plot.timeout.connect(lambda: greeter_server.scale_plot(self))
         self.timer_plot.timeout.connect(self.plot_wind)
 
@@ -246,15 +248,21 @@ class Window(QWidget):
         self.Layout.addLayout(layout4)
 
         label11 = QLabel("Wind Velocity (m/s):")
+        label11.setToolTip("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
+        
         label12 = QLabel("U-axis (NS):")
+        label12.setToolTip("South - North")
         label12.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.uLabel = QLabel()
         self.uLabel.setStyleSheet(style.grey1())
+        self.uLabel.setFixedHeight(24)
 
         label13 = QLabel("V-axis (WE):")
+        label13.setToolTip("East-West")
         label13.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.vLabel = QLabel()
         self.vLabel.setStyleSheet(style.grey1())
+        self.vLabel.setFixedHeight(24)
 
         layout1.addWidget(label11)
         layout1.addWidget(label12)
@@ -262,8 +270,16 @@ class Window(QWidget):
         layout1.addWidget(label13)
         layout1.addWidget(self.vLabel)
 
-        label21 = QLabel("Store Folder:")
+        label21 = QLabel("Folder:")
         self.folderLineEdit = QLineEdit("")
+        self.folderLineEdit.setToolTip("folder path to store data:")
+        try:
+            with open("par1/folder.txt", "r") as f:
+                temp = f.read()
+            self.folderLineEdit.setText(temp)
+        except:
+            print("No folder path loaded.")
+        
         folderButton = QPushButton("Browse")
         folderButton.clicked.connect(self.brouse_folder)
         # folderButton.clicked.connect(lambda: func_tab3.browse_file(self))
@@ -285,7 +301,7 @@ class Window(QWidget):
         self.StartButton.setIconSize(QSize(40, 40))
         self.StartButton.clicked.connect(self.start)
         # self.StartButton.clicked.connect(lambda: func_experiment.start_exp(self))
-        label1 = QLabel("   Start")
+        label1 = QLabel("  Start")
         label1.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         layout5.addWidget(self.StartButton)
@@ -296,7 +312,7 @@ class Window(QWidget):
         self.StopButton.setIconSize(QSize(40, 40))
         self.StopButton.clicked.connect(self.stop)
         self.StopButton.setEnabled(False)
-        label2 = QLabel("   Stop")
+        label2 = QLabel("  Stop")
         label2.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         layout6.addWidget(self.StopButton)
@@ -307,20 +323,24 @@ class Window(QWidget):
         # layout9 = QHBoxLayout()
         self.hintLabel = QLabel()
         self.hintLabel.setStyleSheet(style.grey1())
+        self.hintLabel.setFixedHeight(30)
+
 
         # layout7.addWidget(label41)
         layout7.addLayout(layout8)
         # layout7.addLayout(layout9)
         layout7.addWidget(self.hintLabel)
+        layout7.addStretch()
 
         label42 = QLabel("Anemometer port:")
+        label42.setToolTip("Serial-USB port name")
         self.portComboBox = QComboBox()
-        self.portComboBox.setFixedWidth(120)
+        self.portComboBox.setFixedWidth(130)
         self.port_get()
         try:
             with open("par1/port.txt", "r") as f:
                 temp = f.read()
-            self.portComboBox.setCurrentIndex(temp)
+            self.portComboBox.setCurrentText(temp)
         except:
             print("load port failed.")
 
@@ -342,10 +362,8 @@ class Window(QWidget):
 
     # real time display and plot
     def plot_wind(self):
-
-
-        # time series plot
         try:
+            # time series plot
             self.figure1.clear()
             ax1 = self.figure1.add_subplot(111)
 
@@ -353,29 +371,34 @@ class Window(QWidget):
             df = pd.read_csv(data_path)
             wind_u = df["U_speed_NS"]
             wind_v = df["V_speed_WE"]
-            time = df["epoch_time"]
+            epoch_time = df["epoch_time"]
 
-            n = PLOT_WINDOW * 60
+            n = PLOT_WINDOW * DATA_RATE * 60
             if df.shape[0] > n:
                 wind_u = wind_u[-n:]
                 wind_v = wind_v[-n:]
-                time = time[-n:]
+                epoch_time = epoch_time[-n:]
 
             wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
-            ax1.quiver(time, wind_speed, wind_u, wind_v)
+            ax1.quiver(epoch_time, wind_speed, wind_u, wind_v)
+            #print('ok1')
 
             # axis label
-            ax1.set_xlabel("Clock Time: %s" % time.strftime("%Y-%m-%d"))
+            ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
             ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
+            #print('ok2')
 
-            # add mark
-            xx = list(time[::60])
+            # add mark for every minute
+            xx = list(epoch_time[::DATA_RATE * 60])
             xmak = []
             for i in xx:
                 a = time.strftime('%H:%M', time.localtime(i))
                 xmak.append(a)
+            #print(xx)
+            #print(xmak)
             ax1.set_xticks(xx)
             ax1.set_xticklabels(xmak, fontsize=8)
+            #print('ok')
 
             self.canvas1.draw()
 
@@ -402,17 +425,17 @@ class Window(QWidget):
             self.figure2.add_axes(ax)
 
             ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
-            ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.2))
+            ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.3))
             self.canvas2.draw()
 
             # real time values
-            self.uLabel.setText(wind_u[-1])
-            self.vLabel.setText(wind_v[-1])
+            self.uLabel.setText(str(wind_u.iloc[-1]))
+            self.vLabel.setText(str(wind_v.iloc[-1]))
 
             self.hintLabel.setText(self.startText + "Real time display...")
 
         except:
-            self.hintLabel.setText(self.startText + "Failed to real time display.")
+            self.hintLabel.setText(self.startText + " !Real time display failed.")
 
     def reportProgress(self, n):
         self.filename = n
@@ -444,9 +467,13 @@ class Window(QWidget):
 
         if tag:
             self.folder_path = self.folderLineEdit.text()
-            if not os.path.isdir(self.folder_path):
+            if os.path.isdir(self.folder_path):
+                with open("par1/folder.txt", "w") as f:
+                    f.write(self.folder_path)                    
+            else:
                 self.hintLabel.setText("! Folder to store data does not exist.")
                 tag = 0
+
 
         if tag:
             try:
@@ -488,14 +515,14 @@ class Window(QWidget):
         wind = serial.Serial(port, BAUDRATE, timeout = 5)
         x = wind.readline().decode()
         if x:
-            with open("port.txt", "w") as f:
+            with open("par1/port.txt", "w") as f:
                 f.write(port)
-            self.hintLabel.setText("\u2713")
+            self.portHintLabel.setText("\u2713")
             print("Anemometer connected.")
             # print(x)
             return 1
         else:
-            self.hintLabel.setText("\u2713")
+            self.portHintLabel.setText("\u2717")
             print("Anemometer NOT connected.")
             return 0
 

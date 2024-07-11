@@ -1,1 +1,1 @@
-COM2
+/dev/ttyUSB2

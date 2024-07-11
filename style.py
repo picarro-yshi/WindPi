@@ -27,7 +27,7 @@ def headline3():
 
 def grey1():
     return """
-    background-color: lightgrey
+    background-color: lightgrey;
     """
 
 
