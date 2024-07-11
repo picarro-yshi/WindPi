@@ -98,7 +98,6 @@ global stoprun  # 1 stop thread, 0 keep running
 # Step 1: Create a worker class
 class Worker(QObject):
     finished = Signal()
-    # progress = Signal(int)
     progress = Signal(str)
 
     def run(self):
@@ -167,10 +166,22 @@ class Window(QWidget):
 
     def set_window_layout(self):
         mainLayout = QVBoxLayout()
+        self.tabs = QTabWidget()
+        mainLayout.addWidget(self.tabs)
+        self.setLayout(mainLayout)
+
+        self.tab1 = QWidget()
+        self.tab2 = QWidget()
+        self.tabs.addTab(self.tab1, " ⬥ Data Display ")
+        self.tabs.addTab(self.tab2, " ⬥ Settings ")
+
+
+        tab1Layout = QVBoxLayout()
+        self.tab1.setLayout(tab1Layout)
         topLayout = QHBoxLayout()
         bottomLayout = QHBoxLayout()
-        mainLayout.addLayout(topLayout, 5)
-        mainLayout.addLayout(bottomLayout, 95)
+        tab1Layout.addLayout(topLayout, 5)
+        tab1Layout.addLayout(bottomLayout, 95)
 
         logoLabel = QLabel()
         self.add_img("icons/picarro.png", logoLabel, 250, 100)
@@ -538,7 +549,9 @@ def main():
 if __name__ == "__main__":
     main()
 
-# @author: Yilin Shi | 2024.4.25
+
+
+# @author: Yilin Shi | 2024.7.25
 # shiyilin890@gmail.com
 # Bog the Fat Crocodile vvvvvvv
 #                       ^^^^^^^
