@@ -1,24 +1,30 @@
 import sys
 import platform
 import time
+from datetime import datetime
 import os
+import shutil
 import numpy as np
 import pandas as pd
 
 import serial
 
 # import socket
+# default anemometer settings
 # PORT = '/dev/ttyUSB2'
 BAUDRATE = 19200
 DATA_RATE = 4  # Hz
 
-# DATA_PATH = '/mnt/r/crd_G9000/AVXxx/3610-NUV1022/R&D/roofwind/data'
-DATA_REFRESH_TIME = 2  # s
-PLOT_WINDOW = 5  # min
+# default GUI settings
+LOCAL_DATA_PATH = '/home/picarro/Wind_data'  # folder to save data locally
+GUI_REFRESH_TIME = 2  # s
+PLOT_WINDOW = 5  # min, time length for GUI data display
+HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
+
 
 import serial.tools.list_ports as ls
-PORTLIST = [p.device for p in ls.comports()]
-print(PORTLIST)
+# PORTLIST = [p.device for p in ls.comports()]
+# print(PORTLIST)
 
 opsystem = platform.system()  # 'Linux', 'Windows', 'Darwin'
 print(opsystem)
@@ -95,10 +101,24 @@ import style
 global stoprun  # 1 stop thread, 0 keep running
 
 
+def wind_uv_to_dir(U, V):
+    """
+    Calculates the wind direction from the u and v component of wind.
+    Takes into account the wind direction coordinates is different than the
+    trig unit circle coordinate. If the wind directin is 360 then returns zero
+    (by %360)
+    Inputs:
+      U = west/east direction (wind from the west is positive, from the east is negative)
+      V = south/noth direction (wind from the south is positive, from the north is negative)
+    """
+    WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
+    return WDIR
+
 # Step 1: Create a worker class
 class Worker(QObject):
     finished = Signal()
     progress = Signal(str)
+
 
     def run(self):
         """Long-running task."""
@@ -108,40 +128,76 @@ class Worker(QObject):
         with open("par1/port.txt", "r") as f:
             PORT = f.read()
 
-        with open("par1/folder.txt", "r") as f:
-            DATA_PATH = f.read()
+        with open("par1/rdrive.txt", "r") as f:
+            rdrive_path = f.read()
 
         wind = serial.Serial(PORT, BAUDRATE)
-        print(wind.name)
+        print('anemometer USB port: ', wind.name)
 
-        start_time = time.time()
-        now_time = time.strftime("%Y%m%d_%H%M%S")
-        data_path = os.path.join(DATA_PATH, now_time + ".csv")
-        self.progress.emit(now_time)
-        with open(data_path, "w") as f:
-            f.write("epoch_time, clock_time,U_speed_NS,V_speed_WE\n")
+        filename = time.strftime("%Y%m%d_%H")  # %H%M%S
+        self.progress.emit(filename)
+
+        # create folder of the day on local drive
+        folder_path = os.path.join(LOCAL_DATA_PATH, filename[:8])
+        if not os.path.isdir(folder_path):
+            os.mkdir(folder_path)
+
+        file_path = os.path.join(folder_path, filename + ".csv")
+        with open(file_path, "w") as f:
+            f.write(HEADER)
+
+        # create folder of the day on r-drive
+        rdrive_folder = os.path.join(rdrive_path, filename[:8])
+        if not os.path.isdir(rdrive_folder):
+            os.mkdir(rdrive_folder)
 
         while True:
             if stoprun:
                 break
 
-            now = time.time()
-            now_time = time.strftime("%Y%m%d_%H%M%S")
+            epoch = time.time()
+            # use pandas library default time format, to ms
+            clock_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
-            if now - start_time > 3600:  # a new csv every hour
-                data_path = os.path.join(DATA_PATH, now_time + ".csv")
-                with open(data_path, "w") as f:
-                    f.write("epoch_time, clock_time,U_speed_NS,V_speed_WE\n")
-                start_time = now
-                self.progress.emit(now_time)
+            now = time.strftime("%Y%m%d_%H")  # 20240712_14
+
+            # create a new folder every day
+            if (now[-2:] == 0) and (filename[-2:] == 23):
+                # locally
+                folder_path = os.path.join(LOCAL_DATA_PATH, now[:8])
+                os.mkdir(folder_path)
+
+                # on r-drive
+                rdrive_folder = os.path.join(rdrive_path, now[:8])
+                os.mkdir(rdrive_folder)
+
+            # create a new csv every hour and copy to r-drive
+            if now[-2:] != filename[-2:]:
+                # copy previous hour csv to r-drive
+                while True:
+                    try:
+                        shutil.copy2(file_path, rdrive_folder)  # source, destination
+                        break
+                    except:
+                        print("copy to r-drive failed: %s.csv" % filename)
+
+                filename = now
+                file_path = os.path.join(folder_path, filename + ".csv")
+                with open(file_path, "w") as f:
+                    f.write(HEADER)
+                self.progress.emit(filename)
 
             x = wind.readline().decode()
             y = x.split(',')
             u = float(y[1])  # u axis speed, NS
             v = float(y[2])  # v axis speed, WE
 
-            with open(data_path, "a") as f:
-                f.write("%s,%s,%s,%s\n" % (now, now_time, u, v))
+            wind_speed = np.sqrt(u ** 2 + v ** 2)
+            wind_dir = wind_uv_to_dir(u, v)
+
+            with open(file_path, "a") as f:
+                # need a space before clock time so excel reads it as string
+                f.write("%s, %s,%s,%s,%s,%s\n" % (epoch, clock_time, u, v,wind_speed,wind_dir))
 
         self.finished.emit()
 
@@ -181,12 +237,7 @@ class Window(QWidget):
         self.tabs.addTab(self.tab1, " ⬥ Data Display ")
         self.tabs.addTab(self.tab2, " ⬥ Settings ")
 
-
-        tab1Layout = QVBoxLayout()
-        self.tab1.setLayout(tab1Layout)
-
-
-
+        # title layout
         logoLabel = QLabel()
         self.add_img("icons/picarro.png", logoLabel, 250, 100)
         # logoLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -200,6 +251,10 @@ class Window(QWidget):
         topLayout.addWidget(titleLabel)
         topLayout.addStretch(2)
 
+        # tab1 layout
+        tab1Layout = QHBoxLayout()
+        self.tab1.setLayout(tab1Layout)
+
         leftLayout = QVBoxLayout()
         rightLayout = QVBoxLayout()
         gap = QLabel("")
@@ -207,6 +262,7 @@ class Window(QWidget):
         tab1Layout.addWidget(gap)
         tab1Layout.addLayout(rightLayout)
 
+        # tab1 left part
         figure1Layout = QVBoxLayout()
         figure1Layout.setContentsMargins(20, 30, 20, 10)
         box1 = QGroupBox("Time Series Plot")
@@ -217,6 +273,7 @@ class Window(QWidget):
         leftLayout.addWidget(box1)
         leftLayout.addLayout(self.Layout)
 
+        # tab1 right part
         figure2Layout = QVBoxLayout()
         figure2Layout.setContentsMargins(20, 30, 20, 10)
         box2 = QGroupBox("Wind Rose Plot")
@@ -245,14 +302,16 @@ class Window(QWidget):
         self.createLayout1()
         self.createLayout2()
 
-        self.setLayout(mainLayout)
+        # self.setLayout(mainLayout)
 
+        # timer
         self.timer_plot = QTimer()
-        self.timer_plot.setInterval(DATA_REFRESH_TIME * DATA_RATE * 1000)
+        self.timer_plot.setInterval(GUI_REFRESH_TIME * DATA_RATE * 1000)
         # self.timer_plot.timeout.connect(lambda: greeter_server.scale_plot(self))
         self.timer_plot.timeout.connect(self.plot_wind)
 
-    def createLayout1(self):
+
+    def createLayout1(self):  # tab1
         layout1 = QHBoxLayout()
         layout2 = QHBoxLayout()
         layout3 = QHBoxLayout()
@@ -289,7 +348,7 @@ class Window(QWidget):
         self.folderLineEdit = QLineEdit("")
         self.folderLineEdit.setToolTip("folder path to store data:")
         try:
-            with open("par1/folder.txt", "r") as f:
+            with open("par1/rdrive.txt", "r") as f:
                 temp = f.read()
             self.folderLineEdit.setText(temp)
         except:
@@ -382,26 +441,28 @@ class Window(QWidget):
             self.figure1.clear()
             ax1 = self.figure1.add_subplot(111)
 
-            data_path = os.path.join(self.folder_path, self.filename + ".csv")
+            data_path = os.path.join(LOCAL_DATA_PATH, self.filename[:8], self.filename + ".csv")
             df = pd.read_csv(data_path)
-            wind_u = df["U_speed_NS"]
-            wind_v = df["V_speed_WE"]
             epoch_time = df["epoch_time"]
+            wind_u = df["U_velocity_NS"]
+            wind_v = df["V_velocity_WE"]
+            wind_speed = df["speed"]
+            wind_dir = df["direction"]
 
             n = PLOT_WINDOW * DATA_RATE * 60
             if df.shape[0] > n:
+                epoch_time = epoch_time[-n:]
                 wind_u = wind_u[-n:]
                 wind_v = wind_v[-n:]
-                epoch_time = epoch_time[-n:]
+                wind_speed = wind_speed[-n:]
+                wind_dir = wind_dir[-n:]
 
-            wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
+            # wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
             ax1.quiver(epoch_time, wind_speed, wind_u, wind_v)
-            #print('ok1')
 
             # axis label
             ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
             ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
-            #print('ok2')
 
             # add mark for every minute
             xx = list(epoch_time[::DATA_RATE * 60])
@@ -409,31 +470,29 @@ class Window(QWidget):
             for i in xx:
                 a = time.strftime('%H:%M', time.localtime(i))
                 xmak.append(a)
-            #print(xx)
-            #print(xmak)
+
             ax1.set_xticks(xx)
             ax1.set_xticklabels(xmak, fontsize=8)
-            #print('ok')
 
             self.canvas1.draw()
 
             # windrose plot
             self.figure2.clear()
 
-            def wind_uv_to_dir(U, V):
-                """
-                Calculates the wind direction from the u and v component of wind.
-                Takes into account the wind direction coordinates is different than the
-                trig unit circle coordinate. If the wind directin is 360 then returns zero
-                (by %360)
-                Inputs:
-                  U = west/east direction (wind from the west is positive, from the east is negative)
-                  V = south/noth direction (wind from the south is positive, from the north is negative)
-                """
-                WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
-                return WDIR
-
-            wind_dir = wind_uv_to_dir(wind_u, wind_v)
+            # def wind_uv_to_dir(U, V):
+            #     """
+            #     Calculates the wind direction from the u and v component of wind.
+            #     Takes into account the wind direction coordinates is different than the
+            #     trig unit circle coordinate. If the wind directin is 360 then returns zero
+            #     (by %360)
+            #     Inputs:
+            #       U = west/east direction (wind from the west is positive, from the east is negative)
+            #       V = south/noth direction (wind from the south is positive, from the north is negative)
+            #     """
+            #     WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
+            #     return WDIR
+            #
+            # wind_dir = wind_uv_to_dir(wind_u, wind_v)
 
             rect = [0.1, 0.2, 0.8, 0.7]
             ax = WindroseAxes(self.figure2, rect)
@@ -452,11 +511,11 @@ class Window(QWidget):
         except:
             self.hintLabel.setText(self.startText + " !Real time display failed.")
 
-    def reportProgress(self, n):
-        self.filename = n
+    def reportProgress(self, x):
+        self.filename = x  # 20240712_14
 
     def runLongTask(self):
-        PORT = self.portComboBox.currentText()
+        # PORT = self.portComboBox.currentText()
 
         # Step 2: Create a QThread object
         self.thread = QThread()
@@ -483,7 +542,7 @@ class Window(QWidget):
         if tag:
             self.folder_path = self.folderLineEdit.text()
             if os.path.isdir(self.folder_path):
-                with open("par1/folder.txt", "w") as f:
+                with open("par1/rdrive.txt", "w") as f:
                     f.write(self.folder_path)                    
             else:
                 self.hintLabel.setText("! Folder to store data does not exist.")
@@ -522,6 +581,7 @@ class Window(QWidget):
 
     def port_get(self):
         PORTLIST = [p.device for p in ls.comports()]
+        print(PORTLIST)
         self.portComboBox.clear()
         self.portComboBox.addItems(PORTLIST)
 
