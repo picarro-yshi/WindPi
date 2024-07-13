@@ -1,34 +1,30 @@
-import sys
-import platform
-import time
-from datetime import datetime
-import os
-import shutil
-import numpy as np
-import pandas as pd
-
-import serial
-
-# import socket
-# default anemometer settings
-# PORT = '/dev/ttyUSB2'
+# wind anemometer data recorder control code
+#####  default setting parameters  #####
+## anemometer
 BAUDRATE = 19200
-DATA_RATE = 4  # Hz
-
-# default GUI settings
-LOCAL_DATA_PATH = '/home/picarro/Wind_data'  # folder to save data locally
+DATA_RATE = 4  # Hz, data output rate
+## GUI
+LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 2  # s
 PLOT_WINDOW = 5  # min, time length for GUI data display
 HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
 
+import sys
+import platform
+import os
+import shutil
+import time
+from datetime import datetime
+import numpy as np
+import pandas as pd
 
+import serial
 import serial.tools.list_ports as ls
-# PORTLIST = [p.device for p in ls.comports()]
-# print(PORTLIST)
 
 opsystem = platform.system()  # 'Linux', 'Windows', 'Darwin'
 print(opsystem)
-print(platform.node())  # hostname
+print("hostname: ", platform.node())
+
 ## Qt GUI
 if 'rasp' in platform.node():  # on a raspberry pi, use PySide6
     from PySide6.QtGui import QPixmap, QIcon, QAction
@@ -96,6 +92,7 @@ from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as Navigation
 
 from windrose import WindroseAxes
 
+# customized files
 import style
 
 global stoprun  # 1 stop thread, 0 keep running
@@ -114,11 +111,11 @@ def wind_uv_to_dir(U, V):
     WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
     return WDIR
 
+
 # Step 1: Create a worker class
 class Worker(QObject):
     finished = Signal()
     progress = Signal(str)
-
 
     def run(self):
         """Long-running task."""
@@ -126,7 +123,7 @@ class Worker(QObject):
         stoprun = 0
 
         with open("par1/port.txt", "r") as f:
-            PORT = f.read()
+            PORT = f.read()  # '/dev/ttyUSB2'
 
         with open("par1/rdrive.txt", "r") as f:
             rdrive_path = f.read()
@@ -134,7 +131,7 @@ class Worker(QObject):
         wind = serial.Serial(PORT, BAUDRATE)
         print('anemometer USB port: ', wind.name)
 
-        filename = time.strftime("%Y%m%d_%H")  # %H%M%S
+        filename = time.strftime("%Y%m%d_%H")
         self.progress.emit(filename)
 
         # create folder of the day on local drive
@@ -208,7 +205,6 @@ class Window(QWidget):
         self.setGeometry(200, 200, 1200, 800)
         self.setWindowTitle("Wind")
         self.set_window_layout()
-        self.port = '/dev/ttyUSB2'
 
     def add_img(self, imgpath, label, x, y):  # image path, label, x scale, y scale
         p1 = QPixmap(imgpath)
@@ -265,7 +261,7 @@ class Window(QWidget):
         # tab1 left part
         figure1Layout = QVBoxLayout()
         figure1Layout.setContentsMargins(20, 30, 20, 10)
-        box1 = QGroupBox("Time Series Plot")
+        box1 = QGroupBox(" Time Series Plot")
         box1.setStyleSheet(style.box1())
         box1.setLayout(figure1Layout)
 
@@ -276,7 +272,7 @@ class Window(QWidget):
         # tab1 right part
         figure2Layout = QVBoxLayout()
         figure2Layout.setContentsMargins(20, 30, 20, 10)
-        box2 = QGroupBox("Wind Rose Plot")
+        box2 = QGroupBox(" Wind Rose Plot")
         box2.setStyleSheet(style.box2())
         box2.setLayout(figure2Layout)
         rightLayout.addWidget(box2)
@@ -300,30 +296,28 @@ class Window(QWidget):
         figure2Layout.addWidget(self.toolbar2)
 
         self.createLayout1()
-        self.createLayout2()
 
-        # self.setLayout(mainLayout)
+        # tab2 layout
+        self.tab2Layout = QHBoxLayout()
+        self.tab2.setLayout(self.tab2Layout)
+        self.createLayout2()
 
         # timer
         self.timer_plot = QTimer()
         self.timer_plot.setInterval(GUI_REFRESH_TIME * DATA_RATE * 1000)
-        # self.timer_plot.timeout.connect(lambda: greeter_server.scale_plot(self))
         self.timer_plot.timeout.connect(self.plot_wind)
 
 
     def createLayout1(self):  # tab1
         layout1 = QHBoxLayout()
         layout2 = QHBoxLayout()
-        layout3 = QHBoxLayout()
-        layout4 = QHBoxLayout()
+        bottomLayout = QHBoxLayout()
         self.Layout.addLayout(layout1)
         self.Layout.addLayout(layout2)
-        self.Layout.addLayout(layout3)
-        self.Layout.addLayout(layout4)
+        self.Layout.addLayout(bottomLayout)
 
+        # line 1
         label11 = QLabel("Wind Velocity (m/s):")
-        label11.setToolTip("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
-        
         label12 = QLabel("U-axis (NS):")
         label12.setToolTip("South - North")
         label12.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -332,7 +326,7 @@ class Window(QWidget):
         self.uLabel.setFixedHeight(24)
 
         label13 = QLabel("V-axis (WE):")
-        label13.setToolTip("East-West")
+        label13.setToolTip("East - West")
         label13.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.vLabel = QLabel()
         self.vLabel.setStyleSheet(style.grey1())
@@ -344,9 +338,10 @@ class Window(QWidget):
         layout1.addWidget(label13)
         layout1.addWidget(self.vLabel)
 
+        # line 2
         label21 = QLabel("Folder:")
         self.folderLineEdit = QLineEdit("")
-        self.folderLineEdit.setToolTip("folder path to store data:")
+        self.folderLineEdit.setToolTip("R drive folder path to store data:")
         try:
             with open("par1/rdrive.txt", "r") as f:
                 temp = f.read()
@@ -356,61 +351,34 @@ class Window(QWidget):
         
         folderButton = QPushButton("Browse")
         folderButton.clicked.connect(self.brouse_folder)
-        # folderButton.clicked.connect(lambda: func_tab3.browse_file(self))
 
         layout2.addWidget(label21)
         layout2.addWidget(self.folderLineEdit)
         layout2.addWidget(folderButton)
 
-        layout5 = QVBoxLayout()
-        layout6 = QVBoxLayout()
-        layout7 = QVBoxLayout()
+        # line 3
+        layout3 = QVBoxLayout()
+        startButtonLayout = QVBoxLayout()
+        stopButtonLayout = QVBoxLayout()
 
-        layout4.addLayout(layout7, 70)
-        layout4.addLayout(layout5, 15)
-        layout4.addLayout(layout6, 15)
+        bottomLayout.addLayout(layout3, 70)
+        bottomLayout.addLayout(startButtonLayout, 15)
+        bottomLayout.addLayout(stopButtonLayout, 15)
 
-        self.StartButton = QToolButton()
-        self.StartButton.setIcon(QIcon("icons/start1.png"))
-        self.StartButton.setIconSize(QSize(40, 40))
-        self.StartButton.clicked.connect(self.start)
-        # self.StartButton.clicked.connect(lambda: func_experiment.start_exp(self))
-        label1 = QLabel("  Start")
-        label1.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-        layout5.addWidget(self.StartButton)
-        layout5.addWidget(label1)
-
-        self.StopButton = QToolButton()
-        self.StopButton.setIcon(QIcon("icons/stop1.png"))
-        self.StopButton.setIconSize(QSize(40, 40))
-        self.StopButton.clicked.connect(self.stop)
-        self.StopButton.setEnabled(False)
-        label2 = QLabel("  Stop")
-        label2.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-        layout6.addWidget(self.StopButton)
-        layout6.addWidget(label2)
-
-        label41 = QLabel("Data record speed: 4 Hz")
-        layout8 = QHBoxLayout()
-        # layout9 = QHBoxLayout()
+        portLayout = QHBoxLayout()
         self.hintLabel = QLabel()
         self.hintLabel.setStyleSheet(style.grey1())
         self.hintLabel.setFixedHeight(30)
 
+        layout3.addLayout(portLayout)
+        layout3.addWidget(self.hintLabel)
+        layout3.addStretch()
 
-        # layout7.addWidget(label41)
-        layout7.addLayout(layout8)
-        # layout7.addLayout(layout9)
-        layout7.addWidget(self.hintLabel)
-        layout7.addStretch()
-
-        label42 = QLabel("Anemometer port:")
-        label42.setToolTip("Serial-USB port name")
+        portLabel = QLabel("Anemometer port:")
+        portLabel.setToolTip("Serial-USB port name")
         self.portComboBox = QComboBox()
         self.portComboBox.setFixedWidth(130)
-        self.port_get()
+        self.port_get()  # fill dropdown menu
         try:
             with open("par1/port.txt", "r") as f:
                 temp = f.read()
@@ -418,23 +386,139 @@ class Window(QWidget):
         except:
             print("load port failed.")
 
-        portgetButton = QPushButton("Refresh")
+        portgetButton = QPushButton("Get")
         portgetButton.clicked.connect(self.port_get)
+        portgetButton.setToolTip("Get all available USB ports on this computer.")
         portDetectButton = QPushButton("Detect")
         portDetectButton.clicked.connect(self.port_detect)
+        portDetectButton.setToolTip("Detect if anemometer is connected to this port.")
         self.portHintLabel = QLabel("  ")
 
-        # layout8.addWidget(label41)
-        layout8.addWidget(label42)
-        layout8.addWidget(self.portComboBox)
-        layout8.addWidget(portgetButton)
-        layout8.addWidget(portDetectButton)
-        layout8.addWidget(self.portHintLabel)
+        portLayout.addWidget(portLabel)
+        portLayout.addWidget(self.portComboBox)
+        portLayout.addWidget(portgetButton)
+        portLayout.addWidget(portDetectButton)
+        portLayout.addWidget(self.portHintLabel)
+
+        # round buttons
+        self.StartButton = QToolButton()
+        self.StartButton.setIcon(QIcon("icons/start1.png"))
+        self.StartButton.setIconSize(QSize(40, 40))
+        self.StartButton.clicked.connect(self.start)
+        startLabel = QLabel("  Start")
+        startLabel.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        startButtonLayout.addWidget(self.StartButton)
+        startButtonLayout.addWidget(startLabel)
+
+        self.StopButton = QToolButton()
+        self.StopButton.setIcon(QIcon("icons/stop1.png"))
+        self.StopButton.setIconSize(QSize(40, 40))
+        self.StopButton.clicked.connect(self.stop)
+        self.StopButton.setEnabled(False)
+        stopLabel = QLabel("  Stop")
+        stopLabel.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        stopButtonLayout.addWidget(self.StopButton)
+        stopButtonLayout.addWidget(stopLabel)
+
 
     def createLayout2(self):
-        pass
+        leftlayout = QVBoxLayout()
+        rightlayout = QVBoxLayout()
+        gap = QLabel()
+        self.tab2Layout.addLayout(leftlayout, 48)
+        self.tab2Layout.addWidget(gap, 2)
+        self.tab2Layout.addLayout(rightlayout, 50)
+        # self.tab2Layout.addStretch()
 
-    # real time display and plot
+        # left part
+        layout1 = QVBoxLayout()
+        layout2 = QVBoxLayout()
+        layout3 = QVBoxLayout()
+        leftlayout.addLayout(layout1)
+        leftlayout.addLayout(layout2)
+        leftlayout.addLayout(layout3)
+        leftlayout.addStretch()
+
+        # anemometer settings
+        titlelabel1 = QLabel("Anemometer default settings:")
+        titlelabel1.setStyleSheet(style.headline3())
+
+        grid1 = QGridLayout()
+        x = "How to change the parameters: \n" \
+            "Method1:\n find the commands in the 'manual.pdf'," \
+            " update the first line in the 'setup.py' file and run it," \
+            " power off then power on the anemometer" \
+            " to reflect the change.\n" \
+            "Method2:\n take the anemometer and connect to a Windows computer," \
+            " ask John Yiu to help with changing the parameters.\n" \
+            "Then update line 4-5 of 'wind_gui.py' if needed. "
+        howlabel1 = QLabel(x)
+        # howlabel1.setFixedWidth(500)
+        howlabel1.setWordWrap(True)
+
+        layout1.addWidget(titlelabel1)
+        layout1.addLayout(grid1)
+        layout1.addWidget(howlabel1)
+
+        label11a = QLabel("Format: ")
+        label11b = QLabel("U-axis velocity, V-axis velocity")
+        label12a = QLabel("Data record speed: ")
+        label12b = QLabel("4 Hz")
+        label13a = QLabel("Unit: ")
+        label13b = QLabel("m/s")
+
+        grid1.addWidget(label11a, 0, 0)
+        grid1.addWidget(label11b, 0, 1)
+        grid1.addWidget(label12a, 1, 0)
+        grid1.addWidget(label12b, 1, 1)
+        grid1.addWidget(label13a, 2, 0)
+        grid1.addWidget(label13b, 2, 1)
+
+        # GUI settings
+        titlelabel2 = QLabel("GUI default settings:")
+        titlelabel2.setStyleSheet(style.headline3())
+
+        grid2 = QGridLayout()
+        x = "How to change the parameters: \n" \
+            "Update line 6-9 of 'wind_gui.py' as needed. "
+        howlabel2 = QLabel(x)
+        # howlabel2.setFixedWidth(500)
+        howlabel2.setWordWrap(True)
+
+
+        layout2.addWidget(titlelabel2)
+        layout2.addLayout(grid2)
+        layout2.addWidget(howlabel2)
+
+        label21a = QLabel("Local data storage folder: ")
+        label21b = QLabel(LOCAL_DATA_PATH)
+        label22a = QLabel("GUI refresh time: ")
+        label22b = QLabel("%s s" % GUI_REFRESH_TIME)
+        label23a = QLabel("GUI data display time window: ")
+        label23b = QLabel("%s min" % PLOT_WINDOW)
+
+        # LOCAL_DATA_PATH = '/home/picarro/Wind_data'  # folder to save data locally
+        # GUI_REFRESH_TIME = 2  # s
+        # PLOT_WINDOW = 5
+
+        grid2.addWidget(label21a, 0, 0)
+        grid2.addWidget(label21b, 0, 1)
+        grid2.addWidget(label22a, 1, 0)
+        grid2.addWidget(label22b, 1, 1)
+        grid2.addWidget(label23a, 2, 0)
+        grid2.addWidget(label23b, 2, 1)
+
+
+        # right part
+        label= QLabel("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
+        label.setStyleSheet(style.headline3())
+        rightlayout.addWidget(label)
+
+
+
+        # real time display and plot
     def plot_wind(self):
         try:
             # time series plot
@@ -457,7 +541,6 @@ class Window(QWidget):
                 wind_speed = wind_speed[-n:]
                 wind_dir = wind_dir[-n:]
 
-            # wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
             ax1.quiver(epoch_time, wind_speed, wind_u, wind_v)
 
             # axis label
@@ -470,7 +553,6 @@ class Window(QWidget):
             for i in xx:
                 a = time.strftime('%H:%M', time.localtime(i))
                 xmak.append(a)
-
             ax1.set_xticks(xx)
             ax1.set_xticklabels(xmak, fontsize=8)
 
@@ -478,22 +560,6 @@ class Window(QWidget):
 
             # windrose plot
             self.figure2.clear()
-
-            # def wind_uv_to_dir(U, V):
-            #     """
-            #     Calculates the wind direction from the u and v component of wind.
-            #     Takes into account the wind direction coordinates is different than the
-            #     trig unit circle coordinate. If the wind directin is 360 then returns zero
-            #     (by %360)
-            #     Inputs:
-            #       U = west/east direction (wind from the west is positive, from the east is negative)
-            #       V = south/noth direction (wind from the south is positive, from the north is negative)
-            #     """
-            #     WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
-            #     return WDIR
-            #
-            # wind_dir = wind_uv_to_dir(wind_u, wind_v)
-
             rect = [0.1, 0.2, 0.8, 0.7]
             ax = WindroseAxes(self.figure2, rect)
             self.figure2.add_axes(ax)
@@ -515,8 +581,6 @@ class Window(QWidget):
         self.filename = x  # 20240712_14
 
     def runLongTask(self):
-        # PORT = self.portComboBox.currentText()
-
         # Step 2: Create a QThread object
         self.thread = QThread()
         # Step 3: Create a worker object
