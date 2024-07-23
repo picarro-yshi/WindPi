@@ -158,31 +158,27 @@ class Worker(QObject):
             clock_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
             now = time.strftime("%Y%m%d_%H")  # 20240712_14
-
-            # create a new folder every day
-            if (now[-2:] == 0) and (filename[-2:] == 23):
-                # locally
-                folder_path = os.path.join(LOCAL_DATA_PATH, now[:8])
-                os.mkdir(folder_path)
-
-                # on r-drive
-                r_folder_path = os.path.join(rdrive_folder, now[:8])
-                os.mkdir(r_folder_path)
-
+            
             # create a new csv every hour and copy to r-drive
             if now[-2:] != filename[-2:]:
                 # copy previous hour csv to r-drive
-                copied = 0
-                for i in range(10):
+                while True:
                     try:
-                        shutil.copy2(file_path, r_folder_path)  # source, destination
-                        copied = 1
+                        shutil.copy2(file_path, rdrive_folder)  # source, destination
                         break
                     except:
-                        pass
-                if not copied:
-                    print("copy to r-drive failed: %s.csv" % filename)
+                        print("copy to r-drive failed: %s.csv" % filename)
 
+                # create a new folder every day
+                if (now[-2:] == "00") and (filename[-2:] == "23"):
+                    # locally
+                    folder_path = os.path.join(LOCAL_DATA_PATH, now[:8])
+                    os.mkdir(folder_path)
+
+                    # on r-drive
+                    rdrive_folder = os.path.join(rdrive_path, now[:8])
+                    os.mkdir(rdrive_folder)                
+                
                 filename = now
                 file_path = os.path.join(folder_path, filename + ".csv")
                 with open(file_path, "w") as f:
@@ -306,6 +302,9 @@ class Window(QWidget):
         self.tab2Layout = QHBoxLayout()
         self.tab2.setLayout(self.tab2Layout)
         self.createLayout2()
+        print('GUI layout created.')
+        
+        self.delete_folders()
 
         # timer
         self.timer_plot = QTimer()
@@ -504,10 +503,6 @@ class Window(QWidget):
         label23a = QLabel("GUI data display time window: ")
         label23b = QLabel("%s min" % PLOT_WINDOW)
 
-        # LOCAL_DATA_PATH = '/home/picarro/Wind_data'  # folder to save data locally
-        # GUI_REFRESH_TIME = 2  # s
-        # PLOT_WINDOW = 5
-
         grid2.addWidget(label21a, 0, 0)
         grid2.addWidget(label21b, 0, 1)
         grid2.addWidget(label22a, 1, 0)
@@ -522,23 +517,35 @@ class Window(QWidget):
 
 
     ## functions
-    # delete files 3 months ago
+    # delete files saved 3 months ago
     def delete_folders(self):
-        # folders = [name for name in os.listdir(".") if os.path.isdir(name)]
-        # p = "folder1"
         folders = [name for name in os.listdir(LOCAL_DATA_PATH) if os.path.isdir(os.path.join(LOCAL_DATA_PATH, name))]
         folders.sort()
         # print(folders)
         epoch1 = int(time.mktime(time.strptime(folders[0], "%Y%m%d")))
         epoch_now = int(time.time())
         if (epoch_now - epoch1) > 2628000 * MONTH:  # seconds
-            for name in folders:
-                epoch1 = int(time.mktime(time.strptime(name, "%Y%m%d")))
-                if (epoch_now - epoch1) > 2628000 * MONTH:
-                    shutil.rmtree(os.path.join(LOCAL_DATA_PATH, name))
-                    print('Removed folder: ', name)
-                else:
-                    break
+            note = "! There are wind data older than %s months\nin the folder '%s'.\nPress Ok to delete these files and save disk space.\nPress Cancel to keep them (not recommended)." % (MONTH, LOCAL_DATA_PATH)
+
+            reply = QMessageBox.question(
+                self,
+                "Warning",
+                note,
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Ok,
+                )
+
+            if reply == QMessageBox.StandardButton.Ok:
+                for name in folders:
+                    epoch1 = int(time.mktime(time.strptime(name, "%Y%m%d")))
+                    if (epoch_now - epoch1) > 2628000 * MONTH:
+                        shutil.rmtree(os.path.join(LOCAL_DATA_PATH, name))
+                        print('Delete folder: ', name)
+                    else:
+                        break
+            else:
+                print("keep files.")
+
 
     # real time display and plot
     def plot_wind(self):
@@ -587,7 +594,7 @@ class Window(QWidget):
             self.figure2.add_axes(ax)
 
             ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
-            ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.3))
+            ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.27))
             self.canvas2.draw()
 
             # real time values
@@ -629,10 +636,12 @@ class Window(QWidget):
             filename = time.strftime("%Y%m%d_%H")
             file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
             if os.path.isfile(file_path):
-                reply = QMessageBox.question(
+                note = "! File already exist: %s.csv\nTo overwrite this file and proceed, press Ignore,\nTo go back and rename, copy this file, press Cancel" % filename
+
+                reply = QMessageBox.warning(
                     self,
-                    "HINT",
-                    "File already exist",
+                    "Warning",
+                    note,
                     QMessageBox.StandardButton.Ignore | QMessageBox.StandardButton.Cancel,
                     QMessageBox.StandardButton.Ignore,
                 )
@@ -652,11 +661,10 @@ class Window(QWidget):
                 self.hintLabel.setText("! Folder to store data does not exist.")
                 tag = 0
 
-
         if tag:
             try:
                 self.runLongTask()
-                self.timer_plot.start()
+                self.timer_plot.start()                
 
                 self.StartButton.setEnabled(False)
                 self.StopButton.setEnabled(True)

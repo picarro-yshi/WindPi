@@ -51,7 +51,13 @@ def box1():
         border:2px solid;
         border-radius:10px;
         border-color: #283044;
+        margin: 5px;
         }
+        QGroupBox::title {
+            left: 10px;
+            top: 4px;
+        }
+        
     """
 
 def box2():
@@ -64,6 +70,11 @@ def box2():
         border:2px solid gray;
         border-radius:10px;
         border-color: #283044;
+        margin: 5px;
+        }
+        QGroupBox::title {
+            left: 10px;
+            top: 4px;
         }
     """
 
@@ -78,6 +89,7 @@ def box3():
         border:2px solid;
         border-radius:10px;
         border-color: #8b786d;
+        margin: 10px;
         }
     """
 
