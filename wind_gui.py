@@ -8,6 +8,7 @@ LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 2  # s
 PLOT_WINDOW = 5  # min, time length for GUI data display
 HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
+MONTH = 3  # delete files that is how many months old
 
 import sys
 import platform
@@ -126,7 +127,7 @@ class Worker(QObject):
             PORT = f.read()  # '/dev/ttyUSB2'
 
         with open("par1/rdrive.txt", "r") as f:
-            rdrive_path = f.read()
+            rdrive_folder = f.read()
 
         wind = serial.Serial(PORT, BAUDRATE)
         print('anemometer USB port: ', wind.name)
@@ -144,9 +145,9 @@ class Worker(QObject):
             f.write(HEADER)
 
         # create folder of the day on r-drive
-        rdrive_folder = os.path.join(rdrive_path, filename[:8])
-        if not os.path.isdir(rdrive_folder):
-            os.mkdir(rdrive_folder)
+        r_folder_path = os.path.join(rdrive_folder, filename[:8])
+        if not os.path.isdir(r_folder_path):
+            os.mkdir(r_folder_path)
 
         while True:
             if stoprun:
@@ -165,18 +166,22 @@ class Worker(QObject):
                 os.mkdir(folder_path)
 
                 # on r-drive
-                rdrive_folder = os.path.join(rdrive_path, now[:8])
-                os.mkdir(rdrive_folder)
+                r_folder_path = os.path.join(rdrive_folder, now[:8])
+                os.mkdir(r_folder_path)
 
             # create a new csv every hour and copy to r-drive
             if now[-2:] != filename[-2:]:
                 # copy previous hour csv to r-drive
-                while True:
+                copied = 0
+                for i in range(10):
                     try:
-                        shutil.copy2(file_path, rdrive_folder)  # source, destination
+                        shutil.copy2(file_path, r_folder_path)  # source, destination
+                        copied = 1
                         break
                     except:
-                        print("copy to r-drive failed: %s.csv" % filename)
+                        pass
+                if not copied:
+                    print("copy to r-drive failed: %s.csv" % filename)
 
                 filename = now
                 file_path = os.path.join(folder_path, filename + ".csv")
@@ -510,15 +515,32 @@ class Window(QWidget):
         grid2.addWidget(label23a, 2, 0)
         grid2.addWidget(label23b, 2, 1)
 
-
         # right part
         label= QLabel("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
         label.setStyleSheet(style.headline3())
         rightlayout.addWidget(label)
 
 
+    ## functions
+    # delete files 3 months ago
+    def delete_folders(self):
+        # folders = [name for name in os.listdir(".") if os.path.isdir(name)]
+        # p = "folder1"
+        folders = [name for name in os.listdir(LOCAL_DATA_PATH) if os.path.isdir(os.path.join(LOCAL_DATA_PATH, name))]
+        folders.sort()
+        # print(folders)
+        epoch1 = int(time.mktime(time.strptime(folders[0], "%Y%m%d")))
+        epoch_now = int(time.time())
+        if (epoch_now - epoch1) > 2628000 * MONTH:  # seconds
+            for name in folders:
+                epoch1 = int(time.mktime(time.strptime(name, "%Y%m%d")))
+                if (epoch_now - epoch1) > 2628000 * MONTH:
+                    shutil.rmtree(os.path.join(LOCAL_DATA_PATH, name))
+                    print('Removed folder: ', name)
+                else:
+                    break
 
-        # real time display and plot
+    # real time display and plot
     def plot_wind(self):
         try:
             # time series plot
@@ -604,10 +626,28 @@ class Window(QWidget):
             self.hintLabel.setText(" ! Anemometer is not connected.")
 
         if tag:
-            self.folder_path = self.folderLineEdit.text()
-            if os.path.isdir(self.folder_path):
+            filename = time.strftime("%Y%m%d_%H")
+            file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
+            if os.path.isfile(file_path):
+                reply = QMessageBox.question(
+                    self,
+                    "HINT",
+                    "File already exist",
+                    QMessageBox.StandardButton.Ignore | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Ignore,
+                )
+
+                if reply == QMessageBox.StandardButton.Ignore:
+                    print("ignore")
+                else:
+                    tag = 0
+                    print("cancel")
+
+        if tag:
+            self.rdrive_folder = self.folderLineEdit.text()
+            if os.path.isdir(self.rdrive_folder):
                 with open("par1/rdrive.txt", "w") as f:
-                    f.write(self.folder_path)                    
+                    f.write(self.rdrive_folder)
             else:
                 self.hintLabel.setText("! Folder to store data does not exist.")
                 tag = 0
@@ -627,8 +667,8 @@ class Window(QWidget):
                 self.hintLabel.setText(" ! Error start.")
 
 
-
     def stop(self):
+        filename = time.strftime("%Y%m%d_%H")
         global stoprun
         stoprun = 1
 
@@ -636,6 +676,15 @@ class Window(QWidget):
         self.StartButton.setEnabled(True)
         self.StopButton.setEnabled(False)
         # print('Record stopped.')
+
+        # copy last file to R drive
+        file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
+        r_folder_path = os.path.join(self.rdrive_folder, filename[:8])
+        try:
+            shutil.copy2(file_path, r_folder_path)  # source, destination
+        except:
+            print("copy last file to r-drive failed: %s.csv" % filename)
+
         self.hintLabel.setText("Recording stopped at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S"))
 
 
