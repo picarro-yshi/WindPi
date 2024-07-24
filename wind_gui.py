@@ -1,14 +1,15 @@
-# wind anemometer data recorder control code
+# wind anemometer data recorder control code, 2024.7.25
 #####  default setting parameters  #####
 ## anemometer
 BAUDRATE = 19200
 DATA_RATE = 4  # Hz, data output rate
+
 ## GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 2  # s
 PLOT_WINDOW = 5  # min, time length for GUI data display
-HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
 MONTH = 3  # delete files that is how many months old
+HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
 
 import sys
 import platform
@@ -58,7 +59,7 @@ if 'rasp' in platform.node():  # on a raspberry pi, use PySide6
 
 else:
     # use PyQt6
-    from PyQt6.QtGui import QPixmap, QIcon, QAction
+    from PyQt6.QtGui import QPixmap, QIcon, QAction, QFont
     from PyQt6.QtCore import Qt, QTimer, QSize
     from PyQt6.QtWidgets import (
         QApplication,
@@ -90,6 +91,9 @@ else:
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+
 
 from windrose import WindroseAxes
 
@@ -111,6 +115,36 @@ def wind_uv_to_dir(U, V):
     """
     WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
     return WDIR
+
+
+class MathTextLabel(QWidget):
+    def __init__(self, mathText, parent=None, **kwargs):
+        QWidget.__init__(self, parent, **kwargs)
+
+        l=QVBoxLayout(self)
+        l.setContentsMargins(0,0,0,0)
+
+        # self._figure=Figure(edgecolor='r', facecolor='g')
+        self._figure=Figure(edgecolor='r', facecolor=(0.1, 0.2, 0.5))
+        self._figure=Figure()
+        self._canvas=FigureCanvas(self._figure)
+        l.addWidget(self._canvas)
+
+        self._figure.clear()
+        text=self._figure.suptitle(
+            mathText,
+            x=0.06,
+            y=0.8,
+            horizontalalignment='left',)
+            # verticalalignment='top',)
+            # size=qApp.font().pointSize()*2)
+        self._canvas.draw()
+
+        (x0,y0),(x1,y1)=text.get_window_extent().get_points()
+        w=x1-x0; h=y1-y0
+
+        self._figure.set_size_inches(w/80, h/80)
+        # self.setFixedSize(w,h)
 
 
 # Step 1: Create a worker class
@@ -304,7 +338,7 @@ class Window(QWidget):
         self.createLayout2()
         print('GUI layout created.')
         
-        self.delete_folders()
+        # self.delete_folders()
 
         # timer
         self.timer_plot = QTimer()
@@ -434,44 +468,56 @@ class Window(QWidget):
         self.tab2Layout.addLayout(leftlayout, 48)
         self.tab2Layout.addWidget(gap, 2)
         self.tab2Layout.addLayout(rightlayout, 50)
-        # self.tab2Layout.addStretch()
 
         # left part
         layout1 = QVBoxLayout()
+        layout1.setContentsMargins(20, 40, 20, 10)
         layout2 = QVBoxLayout()
+        layout2.setContentsMargins(20, 40, 20, 10)
         layout3 = QVBoxLayout()
-        leftlayout.addLayout(layout1)
-        leftlayout.addLayout(layout2)
+
+        box1 = QGroupBox("Anemometer Default Settings:")
+        box1.setStyleSheet(style.box5())
+        box1.setLayout(layout1)
+
+        box2 = QGroupBox("GUI Default Settings:")
+        box2.setStyleSheet(style.box5())
+        box2.setLayout(layout2)
+
+        leftlayout.addWidget(box1)
+        leftlayout.addWidget(box2)
         leftlayout.addLayout(layout3)
         leftlayout.addStretch()
 
         # anemometer settings
-        titlelabel1 = QLabel("Anemometer default settings:")
-        titlelabel1.setStyleSheet(style.headline3())
-
         grid1 = QGridLayout()
-        x = "How to change the parameters: \n" \
-            "Method1:\n find the commands in the 'manual.pdf'," \
+        gap = QLabel()
+        x = "- How to change the parameters: \n" \
+            "•  Method1:\n    Find the commands in 'Gill Sonic manual.pdf'," \
             " update the first line in the 'setup.py' file and run it," \
             " power off then power on the anemometer" \
             " to reflect the change.\n" \
-            "Method2:\n take the anemometer and connect to a Windows computer," \
+            "•  Method2:\n    Take the anemometer and connect to a Windows computer," \
             " ask John Yiu to help with changing the parameters.\n" \
-            "Then update line 4-5 of 'wind_gui.py' if needed. "
+            "•  Then update lines 4-5 of 'wind_gui.py' if needed. "
         howlabel1 = QLabel(x)
         # howlabel1.setFixedWidth(500)
         howlabel1.setWordWrap(True)
 
-        layout1.addWidget(titlelabel1)
         layout1.addLayout(grid1)
+        layout1.addWidget(gap)
         layout1.addWidget(howlabel1)
 
-        label11a = QLabel("Format: ")
+        label11a = QLabel("• Format: ")
         label11b = QLabel("U-axis velocity, V-axis velocity")
-        label12a = QLabel("Data record speed: ")
+        label12a = QLabel("• Data record speed: ")
         label12b = QLabel("4 Hz")
-        label13a = QLabel("Unit: ")
-        label13b = QLabel("m/s")
+        label13a = QLabel("• Baudrate: ")
+        label13b = QLabel("19200")
+        label14a = QLabel("• Unit of Speed and velocity: ")
+        label14b = QLabel("m/s")
+        label15a = QLabel("• Unit of direction: ")
+        label15b = QLabel("degree")
 
         grid1.addWidget(label11a, 0, 0)
         grid1.addWidget(label11b, 0, 1)
@@ -479,29 +525,29 @@ class Window(QWidget):
         grid1.addWidget(label12b, 1, 1)
         grid1.addWidget(label13a, 2, 0)
         grid1.addWidget(label13b, 2, 1)
-
-        # GUI settings
-        titlelabel2 = QLabel("GUI default settings:")
-        titlelabel2.setStyleSheet(style.headline3())
+        grid1.addWidget(label14a, 3, 0)
+        grid1.addWidget(label14b, 3, 1)
+        grid1.addWidget(label15a, 4, 0)
+        grid1.addWidget(label15b, 4, 1)
 
         grid2 = QGridLayout()
-        x = "How to change the parameters: \n" \
-            "Update line 6-9 of 'wind_gui.py' as needed. "
+        x = "- How to change the parameters: \n" \
+            "•  Update lines 6-9 of 'wind_gui.py' as needed. "
         howlabel2 = QLabel(x)
         # howlabel2.setFixedWidth(500)
         howlabel2.setWordWrap(True)
 
-
-        layout2.addWidget(titlelabel2)
         layout2.addLayout(grid2)
         layout2.addWidget(howlabel2)
 
-        label21a = QLabel("Local data storage folder: ")
+        label21a = QLabel("•  Local data storage folder: ")
         label21b = QLabel(LOCAL_DATA_PATH)
-        label22a = QLabel("GUI refresh time: ")
+        label22a = QLabel("•  GUI refresh time: ")
         label22b = QLabel("%s s" % GUI_REFRESH_TIME)
-        label23a = QLabel("GUI data display time window: ")
+        label23a = QLabel("•  GUI data display time window: ")
         label23b = QLabel("%s min" % PLOT_WINDOW)
+        label24a = QLabel("•  Delete data files that are # months old: ")
+        label24b = QLabel("%s " % MONTH)
 
         grid2.addWidget(label21a, 0, 0)
         grid2.addWidget(label21b, 0, 1)
@@ -509,12 +555,47 @@ class Window(QWidget):
         grid2.addWidget(label22b, 1, 1)
         grid2.addWidget(label23a, 2, 0)
         grid2.addWidget(label23b, 2, 1)
+        grid2.addWidget(label24a, 3, 0)
+        grid2.addWidget(label24b, 3, 1)
 
         # right part
-        label= QLabel("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
-        label.setStyleSheet(style.headline3())
-        rightlayout.addWidget(label)
+        image1 = QLabel()
+        pixmap1 = QPixmap("icons/gill.png")
+        image1.setPixmap(
+            pixmap1.scaled(
+                550,
+                300,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+        )
+        image1.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        label_image = QLabel("Wind Direction Diagram")
+        label_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        layout_equation = QHBoxLayout()
+
+        # label= QLabel("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
+        # label.setStyleSheet(style.headline3())
+        # label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gap =QLabel()
+
+        rightlayout.addWidget(image1, 40)
+        rightlayout.addWidget(label_image, 5)
+        # rightlayout.addStretch(1)
+        rightlayout.addLayout(layout_equation, 12)
+        # rightlayout.addWidget(label, 50)
+        # rightlayout.addStretch(1)
+        rightlayout.addWidget(gap, 43)
+
+        # mathText = r'$X_k = \sum_{n=0}^{N-1} x_n . e^{\frac{-i2\pi kn}{N}}$'
+        mathText = r'$ {Wind\/speed} = \sqrt{ {(u-axis\/\/velocity)}^2 + {(v-axis\/\/velocity)}^2 }$'
+        # rightlayout.addWidget(MathTextLabel(mathText, self), 50)
+        # layout_equation.addStretch(1)
+        layout_equation.addWidget(MathTextLabel(mathText, self))
+        # , alignment=Qt.AlignmentFlag.AlignHCenter)
+        # layout_equation.addStretch(3)
 
     ## functions
     # delete files saved 3 months ago

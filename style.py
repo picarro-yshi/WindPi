@@ -20,7 +20,7 @@ def headline2():
 def headline3():
     return """
     font: bold;
-    font-size: 14px;
+    font-size: 18px;
     color: black
     """
 
@@ -110,9 +110,11 @@ def box4():
 def box5():
     return """
         QGroupBox {
-        background-color:#E5E4E2;
-        border:2px;
+        font:18pt Arial;
+        border:1px solid gray;
         border-radius:5px;
+        border-color: #4a4a4a;
+
         }
     """
 
