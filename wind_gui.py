@@ -28,7 +28,12 @@ print(opsystem)
 print("hostname: ", platform.node())
 
 ## Qt GUI
-if 'rasp' in platform.node():  # on a raspberry pi, use PySide6
+if 'rasp' in platform.node():
+    RASPI = 1
+else:
+    RASPI = 0
+
+if RASPI:  # on a raspberry pi, use PySide6
     from PySide6.QtGui import QPixmap, QIcon, QAction
     from PySide6.QtCore import Qt, QTimer, QSize
     from PySide6.QtWidgets import (
@@ -92,8 +97,6 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-
 
 from windrose import WindroseAxes
 
@@ -115,36 +118,6 @@ def wind_uv_to_dir(U, V):
     """
     WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
     return WDIR
-
-
-class MathTextLabel(QWidget):
-    def __init__(self, mathText, parent=None, **kwargs):
-        QWidget.__init__(self, parent, **kwargs)
-
-        l=QVBoxLayout(self)
-        l.setContentsMargins(0,0,0,0)
-
-        # self._figure=Figure(edgecolor='r', facecolor='g')
-        self._figure=Figure(edgecolor='r', facecolor=(0.1, 0.2, 0.5))
-        self._figure=Figure()
-        self._canvas=FigureCanvas(self._figure)
-        l.addWidget(self._canvas)
-
-        self._figure.clear()
-        text=self._figure.suptitle(
-            mathText,
-            x=0.06,
-            y=0.8,
-            horizontalalignment='left',)
-            # verticalalignment='top',)
-            # size=qApp.font().pointSize()*2)
-        self._canvas.draw()
-
-        (x0,y0),(x1,y1)=text.get_window_extent().get_points()
-        w=x1-x0; h=y1-y0
-
-        self._figure.set_size_inches(w/80, h/80)
-        # self.setFixedSize(w,h)
 
 
 # Step 1: Create a worker class
@@ -341,8 +314,9 @@ class Window(QWidget):
         self.tab2.setLayout(self.tab2Layout)
         self.createLayout2()
         print('GUI layout created.')
-        
-        # self.delete_folders()
+
+        if RASPI:  # on a raspberry pi
+            self.delete_folders()
 
         # timer
         self.timer_plot = QTimer()
@@ -536,7 +510,7 @@ class Window(QWidget):
 
         grid2 = QGridLayout()
         x = "- How to change the parameters: \n" \
-            "•  Update lines 6-9 of 'wind_gui.py' as needed. "
+            "•  Update lines 8-11 of 'wind_gui.py' as needed. "
         howlabel2 = QLabel(x)
         # howlabel2.setFixedWidth(500)
         howlabel2.setWordWrap(True)
@@ -578,28 +552,20 @@ class Window(QWidget):
         label_image = QLabel("Wind Direction Diagram")
         label_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        layout_equation = QHBoxLayout()
+        fig = plt.figure(figsize=(3, 3), linewidth=1)
+        mathText = r'$ {Wind\/speed} = \sqrt{ {(u-axis\/\/velocity)}^2 + {(v-axis\/\/velocity)}^2 }$'
+        plt.rc('font', family='Times New Roman', weight='bold', size=13)
+        plt.rcParams["mathtext.fontset"] = "dejavuserif"
+        fig.text(.0, .3, mathText)
+        canvas = FigureCanvas(fig)
 
-        # label= QLabel("Wind speed = √(u-axis velocity^2 + v-axis velocity^2)")
-        # label.setStyleSheet(style.headline3())
-        # label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gap =QLabel()
+        spacer = QHBoxLayout()
 
         rightlayout.addWidget(image1, 40)
         rightlayout.addWidget(label_image, 5)
-        # rightlayout.addStretch(1)
-        rightlayout.addLayout(layout_equation, 12)
-        # rightlayout.addWidget(label, 50)
-        # rightlayout.addStretch(1)
-        rightlayout.addWidget(gap, 43)
+        rightlayout.addWidget(canvas, 12)
+        rightlayout.addLayout(spacer, 43)
 
-        # mathText = r'$X_k = \sum_{n=0}^{N-1} x_n . e^{\frac{-i2\pi kn}{N}}$'
-        mathText = r'$ {Wind\/speed} = \sqrt{ {(u-axis\/\/velocity)}^2 + {(v-axis\/\/velocity)}^2 }$'
-        # rightlayout.addWidget(MathTextLabel(mathText, self), 50)
-        # layout_equation.addStretch(1)
-        layout_equation.addWidget(MathTextLabel(mathText, self))
-        # , alignment=Qt.AlignmentFlag.AlignHCenter)
-        # layout_equation.addStretch(3)
 
     ## functions
     # delete files saved 3 months ago
