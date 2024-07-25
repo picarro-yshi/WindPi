@@ -111,10 +111,15 @@ def box5():
     return """
         QGroupBox {
         font:18pt Arial;
+        color:#000000;
         border:1px solid gray;
         border-radius:5px;
         border-color: #4a4a4a;
 
+        }
+        QGroupBox::title {
+        left: 10px;
+        top: 4px;
         }
     """
 

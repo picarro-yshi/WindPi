@@ -161,7 +161,7 @@ class Worker(QObject):
             PORT = f.read()  # '/dev/ttyUSB2'
 
         with open("par1/rdrive.txt", "r") as f:
-            rdrive_folder = f.read()
+            RDRIVE_FOLDER = f.read()
 
         wind = serial.Serial(PORT, BAUDRATE)
         print('anemometer USB port: ', wind.name)
@@ -170,18 +170,18 @@ class Worker(QObject):
         self.progress.emit(filename)
 
         # create folder of the day on local drive
-        folder_path = os.path.join(LOCAL_DATA_PATH, filename[:8])
-        if not os.path.isdir(folder_path):
-            os.mkdir(folder_path)
+        local_folder_day = os.path.join(LOCAL_DATA_PATH, filename[:8])
+        if not os.path.isdir(local_folder_day):
+            os.mkdir(local_folder_day)
 
-        file_path = os.path.join(folder_path, filename + ".csv")
-        with open(file_path, "w") as f:
+        local_file_path = os.path.join(local_folder_day, filename + ".csv")
+        with open(local_file_path, "w") as f:
             f.write(HEADER)
 
         # create folder of the day on r-drive
-        r_folder_path = os.path.join(rdrive_folder, filename[:8])
-        if not os.path.isdir(r_folder_path):
-            os.mkdir(r_folder_path)
+        r_folder_day = os.path.join(RDRIVE_FOLDER, filename[:8])
+        if not os.path.isdir(r_folder_day):
+            os.mkdir(r_folder_day)
 
         while True:
             if stoprun:
@@ -196,26 +196,30 @@ class Worker(QObject):
             # create a new csv every hour and copy to r-drive
             if now[-2:] != filename[-2:]:
                 # copy previous hour csv to r-drive
-                while True:
+                copied = 0
+                for i in range (10):
                     try:
-                        shutil.copy2(file_path, rdrive_folder)  # source, destination
+                        shutil.copy2(local_file_path, r_folder_day)  # source, destination
+                        copied = 1
                         break
                     except:
-                        print("copy to r-drive failed: %s.csv" % filename)
+                        pass
+                if not copied:
+                    print("copy to r-drive failed: %s.csv" % filename)
 
                 # create a new folder every day
                 if (now[-2:] == "00") and (filename[-2:] == "23"):
                     # locally
-                    folder_path = os.path.join(LOCAL_DATA_PATH, now[:8])
-                    os.mkdir(folder_path)
+                    local_folder_day = os.path.join(LOCAL_DATA_PATH, now[:8])
+                    os.mkdir(local_folder_day)
 
                     # on r-drive
-                    rdrive_folder = os.path.join(rdrive_path, now[:8])
-                    os.mkdir(rdrive_folder)                
+                    r_folder_day = os.path.join(RDRIVE_FOLDER, now[:8])
+                    os.mkdir(r_folder_day)                
                 
                 filename = now
-                file_path = os.path.join(folder_path, filename + ".csv")
-                with open(file_path, "w") as f:
+                local_file_path = os.path.join(local_folder_day, filename + ".csv")
+                with open(local_file_path, "w") as f:
                     f.write(HEADER)
                 self.progress.emit(filename)
 
@@ -227,7 +231,7 @@ class Worker(QObject):
             wind_speed = np.sqrt(u ** 2 + v ** 2)
             wind_dir = wind_uv_to_dir(u, v)
 
-            with open(file_path, "a") as f:
+            with open(local_file_path, "a") as f:
                 # need a space before clock time so excel reads it as string
                 f.write("%s, %s,%s,%s,%s,%s\n" % (epoch, clock_time, u, v,wind_speed,wind_dir))
 
