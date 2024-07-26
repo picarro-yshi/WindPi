@@ -272,7 +272,7 @@ class Window(QWidget):
 
         # tab1 left part
         figure1Layout = QVBoxLayout()
-        figure1Layout.setContentsMargins(20, 30, 20, 10)
+        figure1Layout.setContentsMargins(15, 30, 15, 10)
         box1 = QGroupBox(" Time Series Plot")
         box1.setStyleSheet(style.box1())
         box1.setLayout(figure1Layout)
@@ -283,7 +283,7 @@ class Window(QWidget):
 
         # tab1 right part
         figure2Layout = QVBoxLayout()
-        figure2Layout.setContentsMargins(20, 30, 20, 10)
+        figure2Layout.setContentsMargins(15, 30, 15, 10)
         box2 = QGroupBox(" Wind Rose Plot")
         box2.setStyleSheet(style.box2())
         box2.setLayout(figure2Layout)
@@ -291,6 +291,7 @@ class Window(QWidget):
 
         # time plot
         self.figure1 = plt.figure()
+        self.figure1.tight_layout()
         self.canvas1 = FigureCanvas(self.figure1)
         self.toolbar1 = NavigationToolbar(self.canvas1, self)
         self.toolbar1.setFixedHeight(30)
