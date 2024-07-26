@@ -1,10 +1,10 @@
 # wind anemometer data recorder control code, 2024.7.25
-#####  default setting parameters  #####
-## anemometer
+#  default setting parameters  #####
+# anemometer
 BAUDRATE = 19200
 DATA_RATE = 4  # Hz, data output rate
 
-## GUI
+# GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 2  # s
 PLOT_WINDOW = 5  # min, time length for GUI data display
@@ -471,13 +471,15 @@ class Window(QWidget):
         grid1 = QGridLayout()
         gap = QLabel()
         x = "- How to change the parameters: \n" \
-            "•  Method1:\n    Find the commands in 'Gill Sonic manual.pdf'," \
-            " update the first line in the 'setup.py' file and run it," \
-            " power off then power on the anemometer" \
-            " to reflect the change.\n" \
+            "•  Method1:\n    Find the command in 'Gill Sonic manual.pdf'," \
+            " update it to line#4 in the 'setup.py' file," \
+            " set line#3 to 1 and run it in a terminal." \
+            " The output should say 'command sent', otherwise run again." \
+            " Power off then power on the anemometer." \
+            " Set line#3 to 2, run it to see if the change has taken effect.\n" \
             "•  Method2:\n    Take the anemometer and connect to a Windows computer," \
             " ask John Yiu to help with changing the parameters.\n" \
-            "•  Then update lines 4-5 of 'wind_gui.py' if needed. "
+            "•  Update lines 4-5 of 'wind_gui.py' as needed. "
         howlabel1 = QLabel(x)
         # howlabel1.setFixedWidth(500)
         howlabel1.setWordWrap(True)
@@ -488,7 +490,7 @@ class Window(QWidget):
 
         label11a = QLabel("• Format: ")
         label11b = QLabel("U-axis velocity, V-axis velocity")
-        label12a = QLabel("• Data record speed: ")
+        label12a = QLabel("• Data output rate: ")
         label12b = QLabel("4 Hz")
         label13a = QLabel("• Baudrate: ")
         label13b = QLabel("19200")
@@ -522,7 +524,7 @@ class Window(QWidget):
         label21b = QLabel(LOCAL_DATA_PATH)
         label22a = QLabel("•  GUI refresh time: ")
         label22b = QLabel("%s s" % GUI_REFRESH_TIME)
-        label23a = QLabel("•  GUI data display time window: ")
+        label23a = QLabel("•  GUI plots time window: ")
         label23b = QLabel("%s min" % PLOT_WINDOW)
         label24a = QLabel("•  Delete data files that are # months old: ")
         label24b = QLabel("%s " % MONTH)
@@ -554,7 +556,7 @@ class Window(QWidget):
 
         fig = plt.figure(figsize=(3, 3), linewidth=1)
         mathText = r'$ {Wind\/speed} = \sqrt{ {(u-axis\/\/velocity)}^2 + {(v-axis\/\/velocity)}^2 }$'
-        plt.rc('font', family='Times New Roman', weight='bold', size=13)
+        plt.rc('font', weight='bold', size=13)
         plt.rcParams["mathtext.fontset"] = "dejavuserif"
         fig.text(.0, .3, mathText)
         canvas = FigureCanvas(fig)
@@ -787,7 +789,7 @@ if __name__ == "__main__":
 
 
 
-# @author: Yilin Shi | 2024.7.25
+# @author: Yilin Shi | 2024.8.1
 # shiyilin890@gmail.com
 # Bog the Fat Crocodile vvvvvvv
 #                       ^^^^^^^
