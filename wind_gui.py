@@ -556,9 +556,9 @@ class Window(QWidget):
 
         fig = plt.figure(figsize=(3, 3), linewidth=1)
         mathText = r'$ {Wind\/speed} = \sqrt{ {(u-axis\/\/velocity)}^2 + {(v-axis\/\/velocity)}^2 }$'
-        plt.rc('font', weight='bold', size=13)
-        plt.rcParams["mathtext.fontset"] = "dejavuserif"
-        fig.text(.0, .3, mathText)
+        #plt.rc('font', weight='bold', size=13)
+        #plt.rcParams["mathtext.fontset"] = "dejavuserif"
+        fig.text(.0, .3, mathText, fontsize = 13)
         canvas = FigureCanvas(fig)
 
         spacer = QHBoxLayout()
@@ -689,18 +689,18 @@ class Window(QWidget):
             filename = time.strftime("%Y%m%d_%H")
             file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
             if os.path.isfile(file_path):
-                note = "! File already exist: %s.csv\nTo overwrite this file and proceed, press Ignore,\nTo go back and rename, copy this file, press Cancel" % filename
+                note = "! File already exist: %s.csv\nTo overwrite this file and proceed, press Ok,\nTo go back and rename, copy this file, press Cancel" % filename
 
                 reply = QMessageBox.warning(
                     self,
                     "Warning",
                     note,
-                    QMessageBox.StandardButton.Ignore | QMessageBox.StandardButton.Cancel,
-                    QMessageBox.StandardButton.Ignore,
+                    QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Ok,
                 )
 
-                if reply == QMessageBox.StandardButton.Ignore:
-                    print("ignore")
+                if reply == QMessageBox.StandardButton.Ok:
+                    print("proceed")
                 else:
                     tag = 0
                     print("cancel")
