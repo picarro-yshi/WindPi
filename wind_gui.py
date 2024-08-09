@@ -155,6 +155,8 @@ class Worker(QObject):
         r_folder_day = os.path.join(RDRIVE_FOLDER, filename[:8])
         if not os.path.isdir(r_folder_day):
             os.mkdir(r_folder_day)
+            
+        uncopied = []  # uncopied csv files, try again later
 
         while True:
             if stoprun:
@@ -169,16 +171,21 @@ class Worker(QObject):
             # create a new csv every hour and copy to r-drive
             if now[-2:] != filename[-2:]:
                 # copy previous hour csv to r-drive
-                copied = 0
-                for i in range (10):
-                    try:
-                        shutil.copy2(local_file_path, r_folder_day)  # source, destination
-                        copied = 1
-                        break
-                    except:
-                        pass
-                if not copied:
-                    print("copy to r-drive failed: %s.csv" % filename)
+                try:
+                    shutil.copy2(local_file_path, r_folder_day)  # source, destination
+                except:
+                    uncopied.append([local_file_path, r_folder_day])
+                    print("- copy to r-drive failed: %s.csv" % filename)
+                    
+                # data failed to copy now try again
+                if uncopied:
+                    for i in range(len(uncopied)):
+                        try:
+                            shutil.copy2(uncopied[0][0], uncopied[0][1])
+                            print("* copy to r-drive successful: %s.csv" % uncopied[0][0])
+                            uncopied.pop(0)
+                        except:
+                            pass
 
                 # create a new folder every day
                 if (now[-2:] == "00") and (filename[-2:] == "23"):
