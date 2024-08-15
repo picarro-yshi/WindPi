@@ -19,6 +19,7 @@ import time
 from datetime import datetime
 import numpy as np
 import pandas as pd
+import csv
 
 import serial
 import serial.tools.list_ports as ls
@@ -158,6 +159,9 @@ class Worker(QObject):
             
         uncopied = []  # uncopied csv files, try again later
 
+        # initiate plot parameters
+        plot_data = []  # epoch, clock_time, u, v, wind_speed, wind_dir
+
         while True:
             if stoprun:
                 break
@@ -214,6 +218,17 @@ class Worker(QObject):
             with open(local_file_path, "a") as f:
                 # need a space before clock time so excel reads it as string
                 f.write("%s, %s,%s,%s,%s,%s\n" % (epoch, clock_time, u, v,wind_speed,wind_dir))
+
+            # data for plotting
+            plot_data.append([epoch, u, v, wind_speed, wind_dir])
+            n = PLOT_WINDOW * DATA_RATE * 60
+            if len(plot_data) > n:
+                plot_data.pop(0)
+
+            plot_file = os.path.join(LOCAL_DATA_PATH, "temp.csv")
+            with open(plot_file, 'w', newline='') as f:
+                write = csv.writer(f)
+                write.writerows(plot_data)
 
         self.finished.emit()
 
@@ -628,54 +643,65 @@ class Window(QWidget):
             self.figure1.clear()
             ax1 = self.figure1.add_subplot(111)
 
-            data_path = os.path.join(LOCAL_DATA_PATH, self.filename[:8], self.filename + ".csv")
-            df = pd.read_csv(data_path)
-            epoch_time = df["epoch_time"]
-            wind_u = df["U_velocity_NS"]
-            wind_v = df["V_velocity_WE"]
-            wind_speed = df["speed"]
-            wind_dir = df["direction"]
+            plot_file = os.path.join(LOCAL_DATA_PATH, "temp.csv")
+            data = np.genfromtxt(plot_file, delimiter=',')
+            # epoch, u, v, wind_speed, wind_dir
 
-            n = PLOT_WINDOW * DATA_RATE * 60
-            if df.shape[0] > n:
-                epoch_time = epoch_time[-n:]
-                wind_u = wind_u[-n:]
-                wind_v = wind_v[-n:]
-                wind_speed = wind_speed[-n:]
-                wind_dir = wind_dir[-n:]
+            if data.size:
+                epoch_time = data[:, 0]
+                wind_u = data[:, 1]
+                wind_v = data[:, 2]
+                wind_speed = data[:, 3]
+                wind_dir = data[:, 4]
 
-            ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
+                # data_path = os.path.join(LOCAL_DATA_PATH, self.filename[:8], self.filename + ".csv")
+                # df = pd.read_csv(data_path)
+                # epoch_time = df["epoch_time"]
+                # wind_u = df["U_velocity_NS"]
+                # wind_v = df["V_velocity_WE"]
+                # wind_speed = df["speed"]
+                # wind_dir = df["direction"]
+                #
+                # n = PLOT_WINDOW * DATA_RATE * 60
+                # if df.shape[0] > n:
+                #     epoch_time = epoch_time[-n:]
+                #     wind_u = wind_u[-n:]
+                #     wind_v = wind_v[-n:]
+                #     wind_speed = wind_speed[-n:]
+                #     wind_dir = wind_dir[-n:]
 
-            # axis label
-            ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
-            ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
+                ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
 
-            # add mark for every minute
-            xx = list(epoch_time[::DATA_RATE * 60])
-            xmak = []
-            for i in xx:
-                a = time.strftime('%H:%M', time.localtime(i))
-                xmak.append(a)
-            ax1.set_xticks(xx)
-            ax1.set_xticklabels(xmak, fontsize=8)
+                # axis label
+                ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
+                ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
 
-            self.canvas1.draw()
+                # add mark for every minute
+                xx = list(epoch_time[::DATA_RATE * 60])
+                xmak = []
+                for i in xx:
+                    a = time.strftime('%H:%M', time.localtime(i))
+                    xmak.append(a)
+                ax1.set_xticks(xx)
+                ax1.set_xticklabels(xmak, fontsize=8)
 
-            # windrose plot
-            self.figure2.clear()
-            rect = [0.1, 0.2, 0.8, 0.7]
-            ax = WindroseAxes(self.figure2, rect)
-            self.figure2.add_axes(ax)
+                self.canvas1.draw()
 
-            ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
-            ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.27))
-            self.canvas2.draw()
+                # windrose plot
+                self.figure2.clear()
+                rect = [0.1, 0.2, 0.8, 0.7]
+                ax = WindroseAxes(self.figure2, rect)
+                self.figure2.add_axes(ax)
 
-            # real time values
-            self.uLabel.setText(str(wind_u.iloc[-1]))
-            self.vLabel.setText(str(wind_v.iloc[-1]))
+                ax.bar(wind_dir, wind_speed, normed=True, opening=0.8, edgecolor='white')
+                ax.set_legend(title='Wind Speed in m/s', bbox_to_anchor=(-0.1, -0.27))
+                self.canvas2.draw()
 
-            self.hintLabel.setText(self.startText + "Real time display...")
+                # real time values
+                self.uLabel.setText(str(wind_u.iloc[-1]))
+                self.vLabel.setText(str(wind_v.iloc[-1]))
+
+                self.hintLabel.setText(self.startText + "Real time display...")
 
         except:
             self.hintLabel.setText(self.startText + " !Real time display failed.")
@@ -771,13 +797,20 @@ class Window(QWidget):
 
 
     def clear_plots(self):
+        for i in range(5):
+            try:
+                plot_file = os.path.join(LOCAL_DATA_PATH, "temp.csv")
+                with open(plot_file, 'w', newline='') as f:
+                    pass
+                print('cleared')
+                break
+            except:
+                print("failed to clear")
 
-        
-        self.timer_plot.stop()
-        self.figure1.clear()
-        self.figure2.clear()
-        self.timer_plot.start()
-        print('cleared')
+        # self.timer_plot.stop()
+        # self.figure1.clear()
+        # self.figure2.clear()
+        # self.timer_plot.start()
 
 
     def brouse_folder(self):
