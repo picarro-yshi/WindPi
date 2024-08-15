@@ -6,7 +6,7 @@ DATA_RATE = 4  # Hz, data output rate
 
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
-GUI_REFRESH_TIME = 2  # s
+GUI_REFRESH_TIME = 1  # s
 PLOT_WINDOW = 5  # min, time length for GUI data display
 MONTH = 3  # delete files that is how many months old
 HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
@@ -116,7 +116,7 @@ def wind_uv_to_dir(U, V):
       U = west/east direction (wind from the west is positive, from the east is negative)
       V = south/noth direction (wind from the south is positive, from the north is negative)
     """
-    WDIR = (270 - np.rad2deg(np.arctan2(V, U))) % 360
+    WDIR = (270 - np.rad2deg(np.arctan2(U, V))) % 360
     return WDIR
 
 
@@ -383,11 +383,13 @@ class Window(QWidget):
         # line 3
         layout3 = QVBoxLayout()
         startButtonLayout = QVBoxLayout()
+        clearButtonLayout = QVBoxLayout()
         stopButtonLayout = QVBoxLayout()
 
         bottomLayout.addLayout(layout3, 70)
-        bottomLayout.addLayout(startButtonLayout, 15)
-        bottomLayout.addLayout(stopButtonLayout, 15)
+        bottomLayout.addLayout(startButtonLayout, 10)
+        bottomLayout.addLayout(clearButtonLayout, 10)
+        bottomLayout.addLayout(stopButtonLayout, 10)
 
         portLayout = QHBoxLayout()
         self.hintLabel = QLabel()
@@ -445,6 +447,17 @@ class Window(QWidget):
 
         stopButtonLayout.addWidget(self.StopButton)
         stopButtonLayout.addWidget(stopLabel)
+        
+        self.ClearButton = QToolButton()
+        self.ClearButton.setIcon(QIcon("icons/clear.png"))
+        self.ClearButton.setIconSize(QSize(40, 40))
+        self.ClearButton.clicked.connect(self.clear_plots)
+        #self.ClearButton.setEnabled(False)
+        clearLabel = QLabel(" Clear")
+        clearLabel.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        clearButtonLayout.addWidget(self.ClearButton)
+        clearButtonLayout.addWidget(clearLabel)        
 
 
     def createLayout2(self):
@@ -631,7 +644,7 @@ class Window(QWidget):
                 wind_speed = wind_speed[-n:]
                 wind_dir = wind_dir[-n:]
 
-            ax1.quiver(epoch_time, wind_speed, wind_u, wind_v)
+            ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
 
             # axis label
             ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
@@ -755,6 +768,16 @@ class Window(QWidget):
             print("copy last file to r-drive failed: %s.csv" % filename)
 
         self.hintLabel.setText("Recording stopped at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S"))
+
+
+    def clear_plots(self):
+
+        
+        self.timer_plot.stop()
+        self.figure1.clear()
+        self.figure2.clear()
+        self.timer_plot.start()
+        print('cleared')
 
 
     def brouse_folder(self):
