@@ -1,5 +1,5 @@
 # wind anemometer data recorder control code, 2024.7.25
-#  default setting parameters  #####
+# default setting parameters  #####
 # anemometer
 BAUDRATE = 19200
 DATA_RATE = 4  # Hz, data output rate
@@ -27,6 +27,9 @@ import serial.tools.list_ports as ls
 opsystem = platform.system()  # 'Linux', 'Windows', 'Darwin'
 print(opsystem)
 print("hostname: ", platform.node())
+
+import warnings
+warnings.filterwarnings('ignore')
 
 ## Qt GUI
 if 'rasp' in platform.node():
@@ -105,6 +108,7 @@ from windrose import WindroseAxes
 import style
 
 global stoprun  # 1 stop thread, 0 keep running
+global clearplot  # 1 clear plots, 0 not
 
 
 def wind_uv_to_dir(U, V):
@@ -120,6 +124,10 @@ def wind_uv_to_dir(U, V):
     WDIR = (270 - np.rad2deg(np.arctan2(U, V))) % 360
     return WDIR
 
+TEMP_FILE = os.path.join(LOCAL_DATA_PATH, "temp.csv")
+with open(TEMP_FILE, 'w', newline='') as f:
+    pass
+    
 
 # Step 1: Create a worker class
 class Worker(QObject):
@@ -130,6 +138,8 @@ class Worker(QObject):
         """Long-running task."""
         global stoprun
         stoprun = 0
+        global clearplot
+        clearplot = 0
 
         with open("par1/port.txt", "r") as f:
             PORT = f.read()  # '/dev/ttyUSB2'
@@ -158,13 +168,16 @@ class Worker(QObject):
             os.mkdir(r_folder_day)
             
         uncopied = []  # uncopied csv files, try again later
-
-        # initiate plot parameters
-        plot_data = []  # epoch, clock_time, u, v, wind_speed, wind_dir
+        plot_data = []
 
         while True:
             if stoprun:
                 break
+                
+            if clearplot:
+                plot_data = []
+                clearplot = 0
+                print('plot cleared.')
 
             epoch = time.time()
             # use pandas library default time format, to ms
@@ -225,8 +238,7 @@ class Worker(QObject):
             if len(plot_data) > n:
                 plot_data.pop(0)
 
-            plot_file = os.path.join(LOCAL_DATA_PATH, "temp.csv")
-            with open(plot_file, 'w', newline='') as f:
+            with open(TEMP_FILE, 'w', newline='') as f:
                 write = csv.writer(f)
                 write.writerows(plot_data)
 
@@ -295,7 +307,7 @@ class Window(QWidget):
         # tab1 left part
         figure1Layout = QVBoxLayout()
         figure1Layout.setContentsMargins(15, 30, 15, 10)
-        box1 = QGroupBox(" Time Series Plot")
+        box1 = QGroupBox(" Time Series Plot (%s mins)" % PLOT_WINDOW)
         box1.setStyleSheet(style.box1())
         box1.setLayout(figure1Layout)
 
@@ -306,14 +318,14 @@ class Window(QWidget):
         # tab1 right part
         figure2Layout = QVBoxLayout()
         figure2Layout.setContentsMargins(15, 30, 15, 10)
-        box2 = QGroupBox(" Wind Rose Plot")
+        box2 = QGroupBox(" Wind Rose Plot (%s mins)" % PLOT_WINDOW)
         box2.setStyleSheet(style.box2())
         box2.setLayout(figure2Layout)
         rightLayout.addWidget(box2)
 
         # time plot
         self.figure1 = plt.figure()
-        self.figure1.tight_layout()
+        #self.figure1.tight_layout()
         self.canvas1 = FigureCanvas(self.figure1)
         self.toolbar1 = NavigationToolbar(self.canvas1, self)
         self.toolbar1.setFixedHeight(30)
@@ -357,19 +369,21 @@ class Window(QWidget):
 
         # line 1
         label11 = QLabel("Wind Velocity (m/s):")
-        label12 = QLabel("U-axis (NS):")
+        label12 = QLabel("U-axis (SN):")
         label12.setToolTip("South - North")
         label12.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.uLabel = QLabel()
-        self.uLabel.setStyleSheet(style.grey1())
+        self.uLabel.setStyleSheet(style.blue1())
         self.uLabel.setFixedHeight(24)
+        self.uLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        label13 = QLabel("V-axis (WE):")
+        label13 = QLabel("V-axis (EW):")
         label13.setToolTip("East - West")
         label13.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.vLabel = QLabel()
-        self.vLabel.setStyleSheet(style.grey1())
+        self.vLabel.setStyleSheet(style.blue1())
         self.vLabel.setFixedHeight(24)
+        self.vLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout1.addWidget(label11)
         layout1.addWidget(label12)
@@ -380,7 +394,7 @@ class Window(QWidget):
         # line 2
         label21 = QLabel("Folder:")
         self.folderLineEdit = QLineEdit("")
-        self.folderLineEdit.setToolTip("R drive folder path to store data:")
+        self.folderLineEdit.setToolTip("Path of R drive folder to store data:")
         try:
             with open("par1/rdrive.txt", "r") as f:
                 temp = f.read()
@@ -401,9 +415,9 @@ class Window(QWidget):
         clearButtonLayout = QVBoxLayout()
         stopButtonLayout = QVBoxLayout()
 
-        bottomLayout.addLayout(layout3, 70)
+        bottomLayout.addLayout(layout3, 68)
         bottomLayout.addLayout(startButtonLayout, 10)
-        bottomLayout.addLayout(clearButtonLayout, 10)
+        bottomLayout.addLayout(clearButtonLayout, 12)
         bottomLayout.addLayout(stopButtonLayout, 10)
 
         portLayout = QHBoxLayout()
@@ -415,8 +429,8 @@ class Window(QWidget):
         layout3.addWidget(self.hintLabel)
         layout3.addStretch()
 
-        portLabel = QLabel("Anemometer port:")
-        portLabel.setToolTip("Serial-USB port name")
+        portLabel = QLabel("Port:")
+        portLabel.setToolTip("Serial-USB port name of Anemometer")
         self.portComboBox = QComboBox()
         self.portComboBox.setFixedWidth(130)
         self.port_get()  # fill dropdown menu
@@ -446,7 +460,7 @@ class Window(QWidget):
         self.StartButton.setIcon(QIcon("icons/start1.png"))
         self.StartButton.setIconSize(QSize(40, 40))
         self.StartButton.clicked.connect(self.start)
-        startLabel = QLabel("  Start")
+        startLabel = QLabel(" Start")
         startLabel.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         startButtonLayout.addWidget(self.StartButton)
@@ -467,8 +481,9 @@ class Window(QWidget):
         self.ClearButton.setIcon(QIcon("icons/clear.png"))
         self.ClearButton.setIconSize(QSize(40, 40))
         self.ClearButton.clicked.connect(self.clear_plots)
-        #self.ClearButton.setEnabled(False)
-        clearLabel = QLabel(" Clear")
+        self.ClearButton.setEnabled(False)
+        self.ClearButton.setToolTip("Clear plots")
+        clearLabel = QLabel("Clear Plots")
         clearLabel.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         clearButtonLayout.addWidget(self.ClearButton)
@@ -642,10 +657,20 @@ class Window(QWidget):
             # time series plot
             self.figure1.clear()
             ax1 = self.figure1.add_subplot(111)
+            box = ax1.get_position()
+            box.x0 = box.x0 + 0.05
+            box.x1 = box.x1 + 0.05
+            box.y0 = box.y0 - 0.02
+            box.y1 = box.y1 + 0.05
+            ax1.set_position(box)
 
-            plot_file = os.path.join(LOCAL_DATA_PATH, "temp.csv")
-            data = np.genfromtxt(plot_file, delimiter=',')
-            # epoch, u, v, wind_speed, wind_dir
+            n = os.path.getsize(TEMP_FILE)
+            if n:
+                data = np.genfromtxt(TEMP_FILE, delimiter=',')
+                # epoch, u, v, wind_speed, wind_dir
+                # this line produces warning, is suppressed
+            else:
+                data= []
 
             if data.size:
                 epoch_time = data[:, 0]
@@ -653,22 +678,6 @@ class Window(QWidget):
                 wind_v = data[:, 2]
                 wind_speed = data[:, 3]
                 wind_dir = data[:, 4]
-
-                # data_path = os.path.join(LOCAL_DATA_PATH, self.filename[:8], self.filename + ".csv")
-                # df = pd.read_csv(data_path)
-                # epoch_time = df["epoch_time"]
-                # wind_u = df["U_velocity_NS"]
-                # wind_v = df["V_velocity_WE"]
-                # wind_speed = df["speed"]
-                # wind_dir = df["direction"]
-                #
-                # n = PLOT_WINDOW * DATA_RATE * 60
-                # if df.shape[0] > n:
-                #     epoch_time = epoch_time[-n:]
-                #     wind_u = wind_u[-n:]
-                #     wind_v = wind_v[-n:]
-                #     wind_speed = wind_speed[-n:]
-                #     wind_dir = wind_dir[-n:]
 
                 ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
 
@@ -698,9 +707,8 @@ class Window(QWidget):
                 self.canvas2.draw()
 
                 # real time values
-                self.uLabel.setText(str(wind_u.iloc[-1]))
-                self.vLabel.setText(str(wind_v.iloc[-1]))
-
+                self.uLabel.setText(str(wind_u[-1]))
+                self.vLabel.setText(str(wind_v[-1]))
                 self.hintLabel.setText(self.startText + "Real time display...")
 
         except:
@@ -764,12 +772,14 @@ class Window(QWidget):
         if tag:
             try:
                 self.runLongTask()
+                time.sleep(3)
                 self.timer_plot.start()                
 
                 self.StartButton.setEnabled(False)
+                self.ClearButton.setEnabled(True)
                 self.StopButton.setEnabled(True)
                 # print('Record started.')
-                self.startText = "Recording started at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S")
+                self.startText = "Started at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S")
                 self.hintLabel.setText(self.startText)
             except:
                 self.hintLabel.setText(" ! Error start.")
@@ -782,6 +792,7 @@ class Window(QWidget):
 
         self.timer_plot.stop()
         self.StartButton.setEnabled(True)
+        self.ClearButton.setEnabled(False)
         self.StopButton.setEnabled(False)
         # print('Record stopped.')
 
@@ -793,24 +804,12 @@ class Window(QWidget):
         except:
             print("copy last file to r-drive failed: %s.csv" % filename)
 
-        self.hintLabel.setText("Recording stopped at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S"))
+        self.hintLabel.setText("Stopped at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S"))
 
 
     def clear_plots(self):
-        for i in range(5):
-            try:
-                plot_file = os.path.join(LOCAL_DATA_PATH, "temp.csv")
-                with open(plot_file, 'w', newline='') as f:
-                    pass
-                print('cleared')
-                break
-            except:
-                print("failed to clear")
-
-        # self.timer_plot.stop()
-        # self.figure1.clear()
-        # self.figure2.clear()
-        # self.timer_plot.start()
+        global clearplot
+        clearplot = 1
 
 
     def brouse_folder(self):

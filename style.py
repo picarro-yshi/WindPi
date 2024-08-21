@@ -29,6 +29,11 @@ def grey1():
     return """
     background-color: lightgrey;
     """
+    
+def blue1():
+    return """
+    background-color: powderblue;
+    """
 
 
 def body1():
