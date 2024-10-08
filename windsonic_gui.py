@@ -1,4 +1,4 @@
-# wind anemometer data recorder control code, 2024.7.25
+# wind anemometer model "WindSonic M" data recorder control code, 2024.7.25
 # default setting parameters  #####
 # anemometer
 BAUDRATE = 19200
@@ -284,7 +284,7 @@ class Window(QWidget):
         self.add_img("icons/picarro.png", logoLabel, 250, 100)
         # logoLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        titleLabel = QLabel("Real Time Wind Data Recorder")
+        titleLabel = QLabel('Real Time Wind Data Recorder for "WindSonic M" ')
         titleLabel.setStyleSheet(style.headline1())
         titleLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -740,11 +740,14 @@ class Window(QWidget):
         if not tag:
             self.hintLabel.setText(" ! Anemometer is not connected.")
 
-        if tag:
+        '''
+        if 0:
+            print('1')
             filename = time.strftime("%Y%m%d_%H")
             file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
             if os.path.isfile(file_path):
                 note = "! File already exist: %s.csv\nTo overwrite this file and proceed, press Ok,\nTo go back and rename, copy this file, press Cancel" % filename
+                print("! File already exist: %s.csv\nTo overwrite this file and proceed, press Ok,\nTo go back and rename, copy this file, press Cancel" % filename)
 
                 reply = QMessageBox.warning(
                     self,
@@ -759,8 +762,10 @@ class Window(QWidget):
                 else:
                     tag = 0
                     print("cancel")
+        '''
 
         if tag:
+            print('2')
             self.rdrive_folder = self.folderLineEdit.text()
             if os.path.isdir(self.rdrive_folder):
                 with open("par1/rdrive.txt", "w") as f:
@@ -770,8 +775,10 @@ class Window(QWidget):
                 tag = 0
 
         if tag:
+            print('3')
             try:
                 self.runLongTask()
+                print('running long task')
                 time.sleep(3)
                 self.timer_plot.start()                
 
