@@ -35,6 +35,11 @@ def blue1():
     background-color: powderblue;
     """
 
+def blue2():
+    return """
+    background-color: honeydew;
+    """
+
 
 def body1():
     return """
