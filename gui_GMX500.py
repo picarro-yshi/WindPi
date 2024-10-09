@@ -130,7 +130,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-# from windrose import WindroseAxes
+from windrose import WindroseAxes
 
 # customized files
 import style
@@ -290,7 +290,7 @@ class Worker(QObject):
 
             # data for battery voltage plot
             if epoch - time_tag > INTERVAL_V * 60:
-                plot_data_v.append(v)
+                plot_data_v.append([epoch, v])
 
                 if len(plot_data_v) > total_v_pts:
                     plot_data_v.pop(0)
@@ -456,6 +456,10 @@ class Window(QWidget):
         self.timer_plot = QTimer()
         self.timer_plot.setInterval(GUI_REFRESH_TIME * 1000)
         self.timer_plot.timeout.connect(self.plot_wind)
+
+        self.timer_battery = QTimer()
+        self.timer_battery.setInterval(INTERVAL_V * 1000)
+        self.timer_battery.timeout.connect(self.plot_voltage)
 
 
     def createLayout1(self):  # tab1
@@ -639,11 +643,11 @@ class Window(QWidget):
         #     " ask John Yiu to help with changing the parameters.\n" \
         #     "•  Update lines 4-5 of 'wind_gui.py' as needed. "
         x = "- These parameters cannot be changed. \n" \
-            "- To view more settings of the anemometer,\n" \
-            "  You can install 'MetSet' software on a Windows computer," \
-            "then install Driver for UPort 1200 to see if the computer is" \
-            "able to recongnize the anemometer, then view the settings" \
-            "on MetSet software."
+            "- To view more settings of the anemometer: \n" \
+            "  install 'MetSet' software on a Windows computer, " \
+            "(if computer cannot recognize the anemometer, " \
+            "install 'Driver for UPort 1200'), then view the settings in MetSet." \
+
         howlabel1 = QLabel(x)
         # howlabel1.setFixedWidth(500)
         howlabel1.setWordWrap(True)
@@ -654,13 +658,13 @@ class Window(QWidget):
 
         # label11a = QLabel("• Format: ")
         # label11b = QLabel("U-axis velocity, V-axis velocity")
-        label11a = QLabel("• Data output rate: ")
+        label11a = QLabel("• Data Output Rate: ")
         label11b = QLabel("1 Hz")
         label12a = QLabel("• Baudrate: ")
         label12b = QLabel("19200")
         label13a = QLabel("• Unit of Wind Speed: ")
         label13b = QLabel("m/s")
-        label14a = QLabel("• Unit of direction: ")
+        label14a = QLabel("• Unit of Direction: ")
         label14b = QLabel("degree")
         label15a = QLabel("• Unit of Temperature: ")
         label15b = QLabel("°C")
@@ -668,7 +672,7 @@ class Window(QWidget):
         label16b = QLabel("hPa")
         label17a = QLabel("• Unit of Relative Humidity: ")
         label17b = QLabel("%")
-        label18a = QLabel("• Unit of GPS height: ")
+        label18a = QLabel("• Unit of GPS Height: ")
         label18b = QLabel("m")
 
         grid1.addWidget(label11a, 0, 0)
@@ -690,7 +694,7 @@ class Window(QWidget):
 
         grid2 = QGridLayout()
         x = "- How to change the parameters: \n" \
-            "•  Update lines 8-11 of 'gui_GMX500.py' as needed. "
+            "•  Update lines 12-17 of 'gui_GMX500.py' as needed. "
         howlabel2 = QLabel(x)
         # howlabel2.setFixedWidth(500)
         howlabel2.setWordWrap(True)
@@ -705,9 +709,9 @@ class Window(QWidget):
         label23a = QLabel("•  Wind rose plot time window: ")
         label23b = QLabel("%s min" % PLOT_WINDOW_WIND)
         label24a = QLabel("•  Battery voltage plot time window: ")
-        label24b = QLabel("%s min" % PLOT_WINDOW_V)
-        label25a = QLabel("•  Delete data files that are # months old: ")
-        label25b = QLabel("%s " % MONTH)
+        label24b = QLabel("%s h" % PLOT_WINDOW_V)
+        label25a = QLabel("•  Delete data taken earlier than: ")
+        label25b = QLabel("%s month" % MONTH)
 
         grid2.addWidget(label21a, 0, 0)
         grid2.addWidget(label21b, 0, 1)
@@ -783,9 +787,9 @@ class Window(QWidget):
 
 
     # real time display and plot
-    def plot_wind(self):
+    def plot_voltage(self):
         try:
-            # time series plot
+            # battery voltage time series plot
             self.figure1.clear()
             ax1 = self.figure1.add_subplot(111)
             box = ax1.get_position()
@@ -794,6 +798,53 @@ class Window(QWidget):
             box.y0 = box.y0 - 0.02
             box.y1 = box.y1 + 0.05
             ax1.set_position(box)
+
+            n = os.path.getsize(TEMP_FILE_V)
+            if n:
+                data = np.genfromtxt(TEMP_FILE_V, delimiter=',')
+                # epoch, voltage
+                # this line produces warning, is suppressed
+            else:
+                data= []
+
+            if data.size:
+                epoch_time = data[:, 0]
+                v = data[:, 1]
+
+                ax1.plot(epoch_time, v)
+
+                # battery voltage plot
+                # ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
+
+                # axis label
+                ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
+                ax1.set_ylabel("Battery Voltage, V", fontsize=10)
+
+                # # add mark for every minute
+                # xx = list(epoch_time[::60])
+                # xmak = []
+                # for i in xx:
+                #     a = time.strftime('%H:%M', time.localtime(i))
+                #     xmak.append(a)
+                # ax1.set_xticks(xx)
+                # ax1.set_xticklabels(xmak, fontsize=8)
+
+                self.canvas1.draw()
+                self.voltageLabel.setText(str(v[-1]))
+        except:
+            print("battery plot failed")
+
+    def plot_wind(self):
+        try:
+            # # battery voltage time series plot
+            # self.figure1.clear()
+            # ax1 = self.figure1.add_subplot(111)
+            # box = ax1.get_position()
+            # box.x0 = box.x0 + 0.05
+            # box.x1 = box.x1 + 0.05
+            # box.y0 = box.y0 - 0.02
+            # box.y1 = box.y1 + 0.05
+            # ax1.set_position(box)
 
             n = os.path.getsize(TEMP_FILE_WIND)
             if n:
@@ -805,27 +856,27 @@ class Window(QWidget):
 
             if data.size:
                 epoch_time = data[:, 0]
-                wind_u = data[:, 1]
-                wind_v = data[:, 2]
-                wind_speed = data[:, 3]
-                wind_dir = data[:, 4]
+                # wind_u = data[:, 1]
+                # wind_v = data[:, 2]
+                wind_speed = data[:, 1]
+                wind_dir = data[:, 2]
 
-                ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
+                # ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
 
                 # axis label
-                ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
-                ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
+                # ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
+                # ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
 
-                # add mark for every minute
-                xx = list(epoch_time[::DATA_RATE * 60])
-                xmak = []
-                for i in xx:
-                    a = time.strftime('%H:%M', time.localtime(i))
-                    xmak.append(a)
-                ax1.set_xticks(xx)
-                ax1.set_xticklabels(xmak, fontsize=8)
-
-                self.canvas1.draw()
+                # # add mark for every minute
+                # xx = list(epoch_time[::60])
+                # xmak = []
+                # for i in xx:
+                #     a = time.strftime('%H:%M', time.localtime(i))
+                #     xmak.append(a)
+                # ax1.set_xticks(xx)
+                # ax1.set_xticklabels(xmak, fontsize=8)
+                #
+                # self.canvas1.draw()
 
                 # windrose plot
                 self.figure2.clear()
@@ -838,8 +889,8 @@ class Window(QWidget):
                 self.canvas2.draw()
 
                 # real time values
-                self.uLabel.setText(str(wind_u[-1]))
-                self.vLabel.setText(str(wind_v[-1]))
+                self.windSpeedLabel.setText(str(wind_speed[-1]))
+                self.windDirLabel.setText(str(wind_dir[-1]))
                 self.hintLabel.setText(self.startText + "Real time display...")
 
         except:
@@ -911,7 +962,7 @@ class Window(QWidget):
                 self.runLongTask()
                 print('running long task')
                 time.sleep(3)
-                self.timer_plot.start()                
+                self.timer_plot.start()
 
                 self.StartButton.setEnabled(False)
                 self.ClearButton.setEnabled(True)

@@ -37,7 +37,7 @@ def blue1():
 
 def blue2():
     return """
-    background-color: honeydew;
+    background-color: yellowgreen;
     """
 
 
