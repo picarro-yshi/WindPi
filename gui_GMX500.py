@@ -3,7 +3,6 @@
 ### custom parameters  ###
 # anemometer
 BAUDRATE = 19200
-# DATA_RATE = 4  # Hz, data output rate
 
 # I2C board
 VOLTAGE_MIN = 0.884  # battery is 12 V, lower than this means battery is dead.
@@ -38,9 +37,7 @@ import platform
 import os
 import shutil
 import time
-# from datetime import datetime
 import numpy as np
-# import pandas as pd
 import csv
 
 import serial
@@ -69,7 +66,6 @@ if RASPI:  # on a raspberry pi, use PySide6
         QTabWidget,
         QPushButton,
         QMessageBox,
-        # QTableWidget,
         QTextEdit,
         QLineEdit,
         QToolButton,
@@ -82,8 +78,6 @@ if RASPI:  # on a raspberry pi, use PySide6
         QGroupBox,
         QProgressBar,
         QComboBox,
-        # QTableWidgetItem,
-        QScrollArea,
         QToolBar,
         QMainWindow,
         QFileDialog,
@@ -103,7 +97,6 @@ else:
         QTabWidget,
         QPushButton,
         QMessageBox,
-        # QTableWidget,
         QTextEdit,
         QLineEdit,
         QToolButton,
@@ -116,8 +109,6 @@ else:
         QGroupBox,
         QProgressBar,
         QComboBox,
-        # QTableWidgetItem,
-        QScrollArea,
         QToolBar,
         QMainWindow,
         QFileDialog,
@@ -128,7 +119,6 @@ else:
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
 
 from windrose import WindroseAxes
 
@@ -139,41 +129,8 @@ global stoprun  # 1 stop thread, 0 keep running
 global clearplot  # 1 clear plots, 0 not
 
 
-# def wind_uv_to_dir(U, V):
-#     """
-#     Calculates the wind direction from the u and v component of wind.
-#     Takes into account the wind direction coordinates is different than the
-#     trig unit circle coordinate. If the wind directin is 360 then returns zero
-#     (by %360)
-#     Inputs:
-#       U = west/east direction (wind from the west is positive, from the east is negative)
-#       V = south/noth direction (wind from the south is positive, from the north is negative)
-#     """
-#     WDIR = (270 - np.rad2deg(np.arctan2(U, V))) % 360
-#     return WDIR
-
 TEMP_FILE_WIND = os.path.join(LOCAL_DATA_PATH, "tempwind.csv")
-#with open(TEMP_FILE_WIND, 'w', newline='') as f:
-#    pass
-    
 TEMP_FILE_V = os.path.join(LOCAL_DATA_PATH, "tempv.csv")
-#with open(TEMP_FILE_V, 'w', newline='') as f:
-#    pass
-
-
-# def record(x, v, local_file_path):
-#     y = x.split(',')
-#     z = y[9].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
-#
-#     epoch = time.time()
-#     clock_time = time.strftime('%Y-%m-%d %H:%M:%S')
-#
-#     with open(local_file_path, "a") as f:
-#         # need a space before clock time so excel reads it as string
-#         f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
-#                 (epoch, clock_time, y[1], y[2], y[3], y[4],
-#                 y[5], y[6], y[7], y[8], z[0], z[1], z[2], y[11], v))
-#     return y[3], y[4]  # corrected direction&speed
 
 
 # Step 1: Create a worker class
@@ -247,11 +204,6 @@ class Worker(QObject):
                 clearplot = 0
                 print('plot cleared.')
 
-            # epoch = time.time()
-            # use pandas library default time format, to ms
-            # clock_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            # clock_time = time.strftime('%Y-%m-%d %H:%M:%S')
-
             epoch = time.time()
             clock_time = time.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -310,8 +262,7 @@ class Worker(QObject):
                     write.writerows(plot_data_v)
 
                 time_tag = epoch
-                # print("logged v")
-            
+
             try:
                 x = wind.readline().decode()
                 # print(x)
@@ -327,21 +278,8 @@ class Worker(QObject):
                             (epoch, clock_time, y[1], y[2], wind_speed, wind_dir,
                              y[5], y[6], y[7], y[8], z[0], z[1], z[2], y[11], v))
 
-
-                # x = wind.readline().decode()
-                # y = x.split(',')
-                # u = float(y[1])  # u axis speed, NS
-                # v = float(y[2])  # v axis speed, WE
-                #
-                # wind_speed = np.sqrt(u ** 2 + v ** 2)
-                # wind_dir = wind_uv_to_dir(u, v)
-                #
-                # with open(local_file_path, "a") as f:
-                #     # need a space before clock time so excel reads it as string
-                #     f.write("%s, %s,%s,%s,%s,%s\n" % (epoch, clock_time, u, v,wind_speed,wind_dir))
-
                 # data for wind rose plot
-                plot_data_wind.append([epoch, wind_dir, wind_speed])
+                plot_data_wind.append([wind_dir, wind_speed])
                 if len(plot_data_wind) > total_wind_pts:
                     plot_data_wind.pop(0)
 
@@ -448,7 +386,6 @@ class Window(QWidget):
         figure1Layout.addLayout(layout1)
         layout1.addWidget(self.toolbar1)
         layout1.addWidget(self.batteryLabel)
-        # figure1Layout.addWidget(self.toolbar1)
 
         # windrose plot
         self.figure2 = plt.figure()
@@ -495,7 +432,6 @@ class Window(QWidget):
         self.windSpeedLabel.setStyleSheet(style.blue1())
         self.windSpeedLabel.setFixedHeight(24)
         self.windSpeedLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # self.uLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         label12 = QLabel("Wind Direction (°):")
         label12.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -505,9 +441,7 @@ class Window(QWidget):
         self.windDirLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         label13 = QLabel("Battery Voltage (V):")
-        # label13.setToolTip("East - West")
         label13.setAlignment(Qt.AlignmentFlag.AlignRight)
-        # self.vLabel = QLabel()
         self.voltageLabel = QLabel()
         self.voltageLabel.setStyleSheet(style.green1())
         self.voltageLabel.setFixedHeight(24)
@@ -650,16 +584,6 @@ class Window(QWidget):
         # anemometer settings
         grid1 = QGridLayout()
         gap = QLabel()
-        # x = "- How to change the parameters: \n" \
-        #     "•  Method1:\n    Find the command in 'Gill Sonic manual.pdf'," \
-        #     " update it to line#4 in the 'setup.py' file," \
-        #     " set line#3 to 1 and run it in a terminal." \
-        #     " The output should say 'command sent', otherwise run again." \
-        #     " Power off then power on the anemometer." \
-        #     " Set line#3 to 2, run it to see if the change has taken effect.\n" \
-        #     "•  Method2:\n    Take the anemometer and connect to a Windows computer," \
-        #     " ask John Yiu to help with changing the parameters.\n" \
-        #     "•  Update lines 4-5 of 'wind_gui.py' as needed. "
         x = "- These parameters cannot be changed. \n" \
             "- To view more settings of the anemometer: \n" \
             "  install 'MetSet' software on a Windows computer, " \
@@ -667,15 +591,12 @@ class Window(QWidget):
             "install 'Driver for UPort 1200'), then view the settings in MetSet." \
 
         howlabel1 = QLabel(x)
-        # howlabel1.setFixedWidth(500)
         howlabel1.setWordWrap(True)
 
         layout1.addLayout(grid1)
         layout1.addWidget(gap)
         layout1.addWidget(howlabel1)
 
-        # label11a = QLabel("• Format: ")
-        # label11b = QLabel("U-axis velocity, V-axis velocity")
         label11a = QLabel("• Data Output Rate: ")
         label11b = QLabel("1 Hz")
         label12a = QLabel("• Baudrate: ")
@@ -711,10 +632,9 @@ class Window(QWidget):
         grid1.addWidget(label18b, 7, 1)
 
         grid2 = QGridLayout()
-        x = "- How to change the parameters: \n" \
+        x = "- How to change these parameters: \n" \
             "•  Update lines 12-17 of 'gui_GMX500.py' as needed. "
         howlabel2 = QLabel(x)
-        # howlabel2.setFixedWidth(500)
         howlabel2.setWordWrap(True)
 
         layout2.addLayout(grid2)
@@ -765,8 +685,6 @@ class Window(QWidget):
         fig.text(.0, .3, mathText, fontsize = 13)
         canvas = FigureCanvas(fig)
 
-        #spacer = QHBoxLayout()
-        
         image2 = QLabel()
         pixmap = QPixmap("icons/GPS.png")
         image2.setPixmap(
@@ -787,7 +705,6 @@ class Window(QWidget):
         rightlayout.addWidget(canvas, 15)
         rightlayout.addWidget(image2, 30)
         rightlayout.addWidget(label2_image, 5)
-        #rightlayout.addLayout(spacer, 30)
 
 
     ## functions
@@ -851,30 +768,15 @@ class Window(QWidget):
                 
         ax1.set_xticks(xx)
         ax1.set_xticklabels(xmak, fontsize=8)
-        
 
 
     # real time display and plot
     def plot_voltage(self):
         try:
-            '''
-            self.figure1.clear()
-            
-            ax1 = self.figure1.add_subplot(111)
-            box = ax1.get_position()
-            box.x0 = box.x0 + 0.04
-            box.x1 = box.x1 + 0.05
-            box.y0 = box.y0 - 0.01
-            box.y1 = box.y1 + 0.05
-            ax1.set_position(box)
-            '''
-
             n = os.path.getsize(TEMP_FILE_V)
-            #print("size n", n)
             if n:
-                data = np.genfromtxt(TEMP_FILE_V, delimiter=',')
-                #print(data)
-                # epoch, voltage
+                data = np.genfromtxt(TEMP_FILE_V, delimiter=',')  # epoch, voltage
+                # print(data)
                 # this line produces warning, is suppressed
             else:
                 data= []
@@ -901,35 +803,6 @@ class Window(QWidget):
                         self.battery_state = 1
                         self.voltageLabel.setStyleSheet(style.green1())
 
-                '''
-                self.ax1.plot(epoch_time, v, marker = ".", color = "black", linewidth = 0.7)
-                #self.ax1.grid(alpha = 0.3)
-
-                # axis label
-                self.ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
-                #ax1.set_ylabel("Battery Voltage, V", fontsize=10)
-                #print("ok")
-
-                # add mark for every half hour
-                xx = [epoch_time[0]]
-                xmak = [time.strftime('%H:%M', time.localtime(epoch_time[0]))]
-                for i in range(1, len(epoch_time)):
-                    t = epoch_time[i]
-                    clock0 = time.strftime('%M:%S', time.localtime(epoch_time[i-1]))
-                    clock =  time.strftime('%M:%S', time.localtime(t))
-                    if (clock0[:2] == '29' and clock[:2]=='30') or (clock0[:2] == '59' and clock[:2]=='00'):
-                        xx.append(int(t))
-                        xmak.append(time.strftime('%H:%M', time.localtime(t)))       
-                
-                #xx = list(epoch_time[::60])
-                #xmak = []
-                #for i in xx:
-                #    a = time.strftime('%H:%M', time.localtime(i))
-                #    xmak.append(a)
-                self.ax1.set_xticks(xx)
-                self.ax1.set_xticklabels(xmak, fontsize=8)
-                '''
-
                 self.plot_v(epoch_time, v)
                 self.canvas1.draw()
         except:
@@ -937,47 +810,16 @@ class Window(QWidget):
 
     def plot_wind(self):
         try:
-            # # battery voltage time series plot
-            # self.figure1.clear()
-            # ax1 = self.figure1.add_subplot(111)
-            # box = ax1.get_position()
-            # box.x0 = box.x0 + 0.05
-            # box.x1 = box.x1 + 0.05
-            # box.y0 = box.y0 - 0.02
-            # box.y1 = box.y1 + 0.05
-            # ax1.set_position(box)
-
             n = os.path.getsize(TEMP_FILE_WIND)
             if n:
-                data = np.genfromtxt(TEMP_FILE_WIND, delimiter=',')
-                # epoch, u, v, wind_speed, wind_dir
+                data = np.genfromtxt(TEMP_FILE_WIND, delimiter=',')  # wind_dir, wind_speed
                 # this line produces warning, is suppressed
             else:
                 data= []
 
             if data.size:
-                epoch_time = data[:, 0]
-                # wind_u = data[:, 1]
-                # wind_v = data[:, 2]
-                wind_dir = data[:, 1]
-                wind_speed = data[:, 2]
-
-                # ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
-
-                # axis label
-                # ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
-                # ax1.set_ylabel("Wind Speed, m/s", fontsize=10)
-
-                # # add mark for every minute
-                # xx = list(epoch_time[::60])
-                # xmak = []
-                # for i in xx:
-                #     a = time.strftime('%H:%M', time.localtime(i))
-                #     xmak.append(a)
-                # ax1.set_xticks(xx)
-                # ax1.set_xticklabels(xmak, fontsize=8)
-                #
-                # self.canvas1.draw()
+                wind_dir = data[:, 0]
+                wind_speed = data[:, 1]
 
                 # windrose plot
                 self.figure2.clear()
@@ -1017,40 +859,13 @@ class Window(QWidget):
         self.thread.start()
 
 
-
-
     def start(self):
         # error check
         tag = self.port_detect()
         if not tag:
             self.hintLabel.setText(" ! Anemometer is not connected.")
 
-        '''
-        if 0:
-            print('1')
-            filename = time.strftime("%Y%m%d_%H")
-            file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
-            if os.path.isfile(file_path):
-                note = "! File already exist: %s.csv\nTo overwrite this file and proceed, press Ok,\nTo go back and rename, copy this file, press Cancel" % filename
-                print("! File already exist: %s.csv\nTo overwrite this file and proceed, press Ok,\nTo go back and rename, copy this file, press Cancel" % filename)
-
-                reply = QMessageBox.warning(
-                    self,
-                    "Warning",
-                    note,
-                    QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
-                    QMessageBox.StandardButton.Ok,
-                )
-
-                if reply == QMessageBox.StandardButton.Ok:
-                    print("proceed")
-                else:
-                    tag = 0
-                    print("cancel")
-        '''
-
         if tag:
-            #print('2')
             self.rdrive_folder = self.folderLineEdit.text()
             if os.path.isdir(self.rdrive_folder):
                 with open("par1/rdrive.txt", "w") as f:
@@ -1060,38 +875,19 @@ class Window(QWidget):
                 tag = 0
 
         if tag:
-            #print('3')
             try:
                 self.runLongTask()
                 print('running long task')
                 time.sleep(3)
                 
-                # initiate battery plot
+                # initiate battery plot: battery plot updated less (every few minutes)
+                # than wind plot, so display values on GUI at the beginning.
                 data = np.genfromtxt(TEMP_FILE_V, delimiter=',')
                 epoch_time = data[:, 0]
                 v = data[:, 1]
                 v1 = v[-1]
                 self.voltageLabel.setText(str(v1))
                 self.plot_v(epoch_time, v)
-                
-                '''
-                self.figure1.clear()
-                ax1 = self.figure1.add_subplot(111)
-                box = ax1.get_position()
-                box.x0 = box.x0 + 0.04
-                box.x1 = box.x1 + 0.05
-                box.y0 = box.y0 - 0.01
-                box.y1 = box.y1 + 0.05
-                ax1.set_position(box)
-                
-                ax1.plot(epoch_time, v, marker = ".", color = "black", linewidth = 0.7)
-                ax1.grid(alpha = 0.3)
-
-                # axis label
-                ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
-                ax1.set_ylabel("Battery Voltage, V", fontsize=10)
-                '''
-
                 self.canvas1.draw()
                 
                 self.battery_state = 1  # 1: normal, 0: dead
@@ -1101,7 +897,6 @@ class Window(QWidget):
                 self.StartButton.setEnabled(False)
                 self.ClearButton.setEnabled(True)
                 self.StopButton.setEnabled(True)
-                # print('Record started.')
                 self.startText = "Started at: %s. " % time.strftime("%Y-%m-%d %H:%M:%S")
                 self.hintLabel.setText(self.startText)
             except:
@@ -1119,7 +914,6 @@ class Window(QWidget):
         self.StartButton.setEnabled(True)
         self.ClearButton.setEnabled(False)
         self.StopButton.setEnabled(False)
-        # print('Record stopped.')
 
         # copy last file to R drive
         file_path = os.path.join(LOCAL_DATA_PATH, filename[:8], filename + ".csv")
@@ -1177,7 +971,7 @@ if __name__ == "__main__":
 
 
 
-# @author: Yilin Shi | 2024.8.1
+# @author: Yilin Shi | 2024.10.10
 # shiyilin890@gmail.com
 # Bog the Fat Crocodile vvvvvvv
 #                       ^^^^^^^
