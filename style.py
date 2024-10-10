@@ -35,11 +35,22 @@ def blue1():
     background-color: powderblue;
     """
 
-def blue2():
+def green1():
     return """
     background-color: yellowgreen;
     """
 
+def red1():
+    return """
+    background-color: red;
+    """
+
+def red2():
+    return """
+    font: bold;
+    font-size: 14px;
+    color: red
+    """
 
 def body1():
     return """

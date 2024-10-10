@@ -6,14 +6,14 @@ BAUDRATE = 19200
 # DATA_RATE = 4  # Hz, data output rate
 
 # I2C board
-VOLTAGE_MIN = 0  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 0.884  # battery is 12 V, lower than this means battery is dead.
 
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 1  # s
 PLOT_WINDOW_WIND = 5  # min, time length for wind data plot
 PLOT_WINDOW_V = 6  # hour, time length for battery data plot
-INTERVAL_V = 10  # min, plot a battery voltage point every # mins
+INTERVAL_V = 1  # min, plot a battery voltage point every # mins
 MONTH = 3  # delete files that is how many months old
 
 # csv header: 15 items
@@ -153,12 +153,12 @@ global clearplot  # 1 clear plots, 0 not
 #     return WDIR
 
 TEMP_FILE_WIND = os.path.join(LOCAL_DATA_PATH, "tempwind.csv")
-with open(TEMP_FILE_WIND, 'w', newline='') as f:
-    pass
+#with open(TEMP_FILE_WIND, 'w', newline='') as f:
+#    pass
     
 TEMP_FILE_V = os.path.join(LOCAL_DATA_PATH, "tempv.csv")
-with open(TEMP_FILE_V, 'w', newline='') as f:
-    pass
+#with open(TEMP_FILE_V, 'w', newline='') as f:
+#    pass
 
 
 # def record(x, v, local_file_path):
@@ -222,8 +222,20 @@ class Worker(QObject):
             
         uncopied = []  # uncopied csv files, try again later
         plot_data_wind = []
-        plot_data_v = []
+        
+        # initiate the voltage part
         time_tag = time.time()
+        plot_data_v = []
+        for i in range(2):
+            bus_voltage = ina219.bus_voltage
+            shunt_voltage = ina219.shunt_voltage
+            v = round(bus_voltage + shunt_voltage, 2)
+            plot_data_v.append([time_tag, v])
+            
+        with open(TEMP_FILE_V, 'w', newline='') as f:
+            write = csv.writer(f)
+            write.writerows(plot_data_v)
+        
 
         while True:
             if stoprun:
@@ -284,13 +296,11 @@ class Worker(QObject):
             bus_voltage = ina219.bus_voltage  # voltage on V- (load side)
             shunt_voltage = ina219.shunt_voltage  # voltage between V+ and V- across the shunt
             v = round(bus_voltage + shunt_voltage, 5)
-            print("Battery: %s V" % v)
-            if v < VOLTAGE_MIN:
-                print("! Warning, battery is dead.")
+            # print("Battery: %s V" % v)
 
             # data for battery voltage plot
             if epoch - time_tag > INTERVAL_V * 60:
-                plot_data_v.append([epoch, v])
+                plot_data_v.append([epoch, round(v, 2)])
 
                 if len(plot_data_v) > total_v_pts:
                     plot_data_v.pop(0)
@@ -300,13 +310,14 @@ class Worker(QObject):
                     write.writerows(plot_data_v)
 
                 time_tag = epoch
-
-            x = wind.readline().decode()
-            # print(x)
+                # print("logged v")
+            
             try:
+                x = wind.readline().decode()
+                # print(x)
                 y = x.split(',')
-                wind_speed = y[3]  # Corrected_Direction
-                wind_dir = y[4]  # Corrected_Speed
+                wind_dir = y[3]  # Corrected_Direction
+                wind_speed = y[4]  # Corrected_Speed
 
                 z = y[9].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
 
@@ -330,7 +341,7 @@ class Worker(QObject):
                 #     f.write("%s, %s,%s,%s,%s,%s\n" % (epoch, clock_time, u, v,wind_speed,wind_dir))
 
                 # data for wind rose plot
-                plot_data_wind.append([epoch, wind_speed, wind_dir])
+                plot_data_wind.append([epoch, wind_dir, wind_speed])
                 if len(plot_data_wind) > total_wind_pts:
                     plot_data_wind.pop(0)
 
@@ -339,7 +350,8 @@ class Worker(QObject):
                     write.writerows(plot_data_wind)
 
             except:
-                print("- invalid data.")
+                pass
+                # print("- invalid data.")
 
         self.finished.emit()
 
@@ -417,20 +429,26 @@ class Window(QWidget):
         # tab1 right part
         figure2Layout = QVBoxLayout()
         figure2Layout.setContentsMargins(15, 30, 15, 10)
-        box2 = QGroupBox(" Wind Rose Plot (%s mins)" % PLOT_WINDOW_WIND)
+        box2 = QGroupBox(" Wind Rose Plot (%s min)" % PLOT_WINDOW_WIND)
         box2.setStyleSheet(style.box2())
         box2.setLayout(figure2Layout)
         rightLayout.addWidget(box2)
 
-        # time plot
+        # time series plot
         self.figure1 = plt.figure()
         #self.figure1.tight_layout()
         self.canvas1 = FigureCanvas(self.figure1)
         self.toolbar1 = NavigationToolbar(self.canvas1, self)
         self.toolbar1.setFixedHeight(30)
+        self.batteryLabel = QLabel()
+        self.batteryLabel.setStyleSheet(style.red2())
 
+        layout1 = QHBoxLayout()
         figure1Layout.addWidget(self.canvas1)
-        figure1Layout.addWidget(self.toolbar1)
+        figure1Layout.addLayout(layout1)
+        layout1.addWidget(self.toolbar1)
+        layout1.addWidget(self.batteryLabel)
+        # figure1Layout.addWidget(self.toolbar1)
 
         # windrose plot
         self.figure2 = plt.figure()
@@ -458,7 +476,7 @@ class Window(QWidget):
         self.timer_plot.timeout.connect(self.plot_wind)
 
         self.timer_battery = QTimer()
-        self.timer_battery.setInterval(INTERVAL_V * 1000)
+        self.timer_battery.setInterval(INTERVAL_V * 60 * 1000)
         self.timer_battery.timeout.connect(self.plot_voltage)
 
 
@@ -491,7 +509,7 @@ class Window(QWidget):
         label13.setAlignment(Qt.AlignmentFlag.AlignRight)
         # self.vLabel = QLabel()
         self.voltageLabel = QLabel()
-        self.voltageLabel.setStyleSheet(style.blue2())
+        self.voltageLabel.setStyleSheet(style.green1())
         self.voltageLabel.setFixedHeight(24)
         self.voltageLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -726,9 +744,9 @@ class Window(QWidget):
 
         # right part
         image1 = QLabel()
-        pixmap1 = QPixmap("icons/gill.png")
+        pixmap = QPixmap("icons/gill.png")
         image1.setPixmap(
-            pixmap1.scaled(
+            pixmap.scaled(
                 550,
                 300,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -747,12 +765,29 @@ class Window(QWidget):
         fig.text(.0, .3, mathText, fontsize = 13)
         canvas = FigureCanvas(fig)
 
-        spacer = QHBoxLayout()
+        #spacer = QHBoxLayout()
+        
+        image2 = QLabel()
+        pixmap = QPixmap("icons/GPS.png")
+        image2.setPixmap(
+            pixmap.scaled(
+                250,
+                250,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+        )
+        image2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        label2_image = QLabel("GPS Diagram")
+        label2_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        rightlayout.addWidget(image1, 40)
+        rightlayout.addWidget(image1, 45)
         rightlayout.addWidget(label_image, 5)
-        rightlayout.addWidget(canvas, 12)
-        rightlayout.addLayout(spacer, 43)
+        rightlayout.addWidget(canvas, 15)
+        rightlayout.addWidget(image2, 30)
+        rightlayout.addWidget(label2_image, 5)
+        #rightlayout.addLayout(spacer, 30)
 
 
     ## functions
@@ -784,24 +819,61 @@ class Window(QWidget):
                         break
             else:
                 print("keep files.")
+                
+                
+    # battery voltage time series plot
+    def plot_v(self, epoch_time, v):
+        self.figure1.clear()
+        ax1 = self.figure1.add_subplot(111)
+        box = ax1.get_position()
+        box.x0 = box.x0 + 0.04
+        box.x1 = box.x1 + 0.05
+        box.y0 = box.y0 - 0.01
+        box.y1 = box.y1 + 0.05
+        ax1.set_position(box)
+        ax1.plot(epoch_time, v, marker = ".", color = "black", linewidth = 0.7)
+        ax1.grid(alpha = 0.3)
+
+        # axis label
+        ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
+        ax1.set_ylabel("Battery Voltage, V", fontsize=10)
+
+        # add mark for every half hour
+        xx = [epoch_time[0]]
+        xmak = [time.strftime('%H:%M', time.localtime(epoch_time[0]))]
+        for i in range(1, len(epoch_time)):
+            t = epoch_time[i]
+            clock0 = time.strftime('%M:%S', time.localtime(epoch_time[i-1]))
+            clock =  time.strftime('%M:%S', time.localtime(t))
+            if (clock0[:2] == '29' and clock[:2]=='30') or (clock0[:2] == '59' and clock[:2]=='00'):
+                xx.append(int(t))
+                xmak.append(time.strftime('%H:%M', time.localtime(t)))       
+                
+        ax1.set_xticks(xx)
+        ax1.set_xticklabels(xmak, fontsize=8)
+        
 
 
     # real time display and plot
     def plot_voltage(self):
         try:
-            # battery voltage time series plot
+            '''
             self.figure1.clear()
+            
             ax1 = self.figure1.add_subplot(111)
             box = ax1.get_position()
-            box.x0 = box.x0 + 0.05
+            box.x0 = box.x0 + 0.04
             box.x1 = box.x1 + 0.05
-            box.y0 = box.y0 - 0.02
+            box.y0 = box.y0 - 0.01
             box.y1 = box.y1 + 0.05
             ax1.set_position(box)
+            '''
 
             n = os.path.getsize(TEMP_FILE_V)
+            #print("size n", n)
             if n:
                 data = np.genfromtxt(TEMP_FILE_V, delimiter=',')
+                #print(data)
                 # epoch, voltage
                 # this line produces warning, is suppressed
             else:
@@ -810,27 +882,56 @@ class Window(QWidget):
             if data.size:
                 epoch_time = data[:, 0]
                 v = data[:, 1]
+                
+                v1 = v[-1]
+                self.voltageLabel.setText(str(v1))
+                # check if battery is dead
+                if v1 < VOLTAGE_MIN:
+                    b = 0
+                    print("! Warning, battery is dead: ", time.ctime())
+                
+                    if b != self.battery_state:
+                        self.batteryLabel.setText("Battery is dead!")
+                        self.battery_state = 0
+                        self.voltageLabel.setStyleSheet(style.red1())
+                else:
+                    b = 1
+                    if b != self.battery_state:
+                        self.batteryLabel.setText("")
+                        self.battery_state = 1
+                        self.voltageLabel.setStyleSheet(style.green1())
 
-                ax1.plot(epoch_time, v)
-
-                # battery voltage plot
-                # ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
+                '''
+                self.ax1.plot(epoch_time, v, marker = ".", color = "black", linewidth = 0.7)
+                #self.ax1.grid(alpha = 0.3)
 
                 # axis label
-                ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
-                ax1.set_ylabel("Battery Voltage, V", fontsize=10)
+                self.ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
+                #ax1.set_ylabel("Battery Voltage, V", fontsize=10)
+                #print("ok")
 
-                # # add mark for every minute
-                # xx = list(epoch_time[::60])
-                # xmak = []
-                # for i in xx:
-                #     a = time.strftime('%H:%M', time.localtime(i))
-                #     xmak.append(a)
-                # ax1.set_xticks(xx)
-                # ax1.set_xticklabels(xmak, fontsize=8)
+                # add mark for every half hour
+                xx = [epoch_time[0]]
+                xmak = [time.strftime('%H:%M', time.localtime(epoch_time[0]))]
+                for i in range(1, len(epoch_time)):
+                    t = epoch_time[i]
+                    clock0 = time.strftime('%M:%S', time.localtime(epoch_time[i-1]))
+                    clock =  time.strftime('%M:%S', time.localtime(t))
+                    if (clock0[:2] == '29' and clock[:2]=='30') or (clock0[:2] == '59' and clock[:2]=='00'):
+                        xx.append(int(t))
+                        xmak.append(time.strftime('%H:%M', time.localtime(t)))       
+                
+                #xx = list(epoch_time[::60])
+                #xmak = []
+                #for i in xx:
+                #    a = time.strftime('%H:%M', time.localtime(i))
+                #    xmak.append(a)
+                self.ax1.set_xticks(xx)
+                self.ax1.set_xticklabels(xmak, fontsize=8)
+                '''
 
+                self.plot_v(epoch_time, v)
                 self.canvas1.draw()
-                self.voltageLabel.setText(str(v[-1]))
         except:
             print("battery plot failed")
 
@@ -858,8 +959,8 @@ class Window(QWidget):
                 epoch_time = data[:, 0]
                 # wind_u = data[:, 1]
                 # wind_v = data[:, 2]
-                wind_speed = data[:, 1]
-                wind_dir = data[:, 2]
+                wind_dir = data[:, 1]
+                wind_speed = data[:, 2]
 
                 # ax1.quiver(epoch_time, wind_speed, wind_v, wind_u)
 
@@ -916,6 +1017,8 @@ class Window(QWidget):
         self.thread.start()
 
 
+
+
     def start(self):
         # error check
         tag = self.port_detect()
@@ -947,7 +1050,7 @@ class Window(QWidget):
         '''
 
         if tag:
-            print('2')
+            #print('2')
             self.rdrive_folder = self.folderLineEdit.text()
             if os.path.isdir(self.rdrive_folder):
                 with open("par1/rdrive.txt", "w") as f:
@@ -957,12 +1060,43 @@ class Window(QWidget):
                 tag = 0
 
         if tag:
-            print('3')
+            #print('3')
             try:
                 self.runLongTask()
                 print('running long task')
                 time.sleep(3)
+                
+                # initiate battery plot
+                data = np.genfromtxt(TEMP_FILE_V, delimiter=',')
+                epoch_time = data[:, 0]
+                v = data[:, 1]
+                v1 = v[-1]
+                self.voltageLabel.setText(str(v1))
+                self.plot_v(epoch_time, v)
+                
+                '''
+                self.figure1.clear()
+                ax1 = self.figure1.add_subplot(111)
+                box = ax1.get_position()
+                box.x0 = box.x0 + 0.04
+                box.x1 = box.x1 + 0.05
+                box.y0 = box.y0 - 0.01
+                box.y1 = box.y1 + 0.05
+                ax1.set_position(box)
+                
+                ax1.plot(epoch_time, v, marker = ".", color = "black", linewidth = 0.7)
+                ax1.grid(alpha = 0.3)
+
+                # axis label
+                ax1.set_xlabel("Local Clock Time: %s" % (time.strftime("%Y-%m-%d")))
+                ax1.set_ylabel("Battery Voltage, V", fontsize=10)
+                '''
+
+                self.canvas1.draw()
+                
+                self.battery_state = 1  # 1: normal, 0: dead
                 self.timer_plot.start()
+                self.timer_battery.start()
 
                 self.StartButton.setEnabled(False)
                 self.ClearButton.setEnabled(True)
@@ -980,6 +1114,8 @@ class Window(QWidget):
         stoprun = 1
 
         self.timer_plot.stop()
+        self.timer_battery.stop()
+
         self.StartButton.setEnabled(True)
         self.ClearButton.setEnabled(False)
         self.StopButton.setEnabled(False)
