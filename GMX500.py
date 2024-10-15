@@ -17,7 +17,7 @@ from adafruit_ina219 import INA219
 # custom parameters
 PORT = '/dev/ttyUSB0'
 BAUDRATE = 19200
-VOLTAGE_MIN = 0  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 0.884  # battery is 12 V, lower than this means battery is dead.
 
 # csv header: 15 items
 HEADER = "epoch_time," \
@@ -37,6 +37,9 @@ HEADER = "epoch_time," \
          "Battery_V\n"
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 RDRIVE_FOLDER = "/mnt/r/crd_G9000/AVXxx/Roof_Tower_Data/Anemometer/GMX500"
+WARNING_MSG = os.path.join(RDRIVE_FOLDER, "battery_warning.txt")
+if os.path.isfile(WARNING_MSG):
+    os.remove(WARNING_MSG)
 
 
 # get keyboard input
@@ -146,7 +149,13 @@ def run_wind():
         v = round(bus_voltage + shunt_voltage, 5)
         print("Battery: %s V" % v)
         if v < VOLTAGE_MIN:
-            print("! Warning, battery is dead.")
+            x = "! Warning, battery is dead: %s" % time.ctime()
+            try:
+                with open(WARNING_MSG, 'a') as f:
+                    f.write(x)
+            except:
+                pass
+            print(x)
 
         x = wind.readline().decode()
         print(x)

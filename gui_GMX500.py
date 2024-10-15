@@ -800,9 +800,12 @@ class Window(QWidget):
                 # check if battery is dead
                 if v1 < VOLTAGE_MIN:
                     b = 0
-                    x = "! Warning, battery is dead: ", time.ctime()
-                    with open(self.warning_msg, 'r') as f:
-                        f.write(x)
+                    x = "! Warning, battery is dead: %s" % time.ctime()
+                    try:
+                        with open(self.warning_msg, 'a') as f:
+                            f.write(x)
+                    except:
+                        pass
                     print(x)
                 
                     if b != self.battery_state:
