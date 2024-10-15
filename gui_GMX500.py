@@ -10,9 +10,9 @@ VOLTAGE_MIN = 0.884  # battery is 12 V, lower than this means battery is dead.
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 1  # s
-PLOT_WINDOW_WIND = 5  # min, time length for wind data plot
+PLOT_WINDOW_WIND = 10  # min, time length for wind data plot
 PLOT_WINDOW_V = 6  # hour, time length for battery data plot
-INTERVAL_V = 1  # min, plot a battery voltage point every # mins
+INTERVAL_V = 5  # min, plot a battery voltage point every # mins
 MONTH = 3  # delete files that is how many months old
 
 # csv header: 15 items
@@ -29,6 +29,7 @@ HEADER = "epoch_time," \
          "GPS_Latitude," \
          "GPS_longitude," \
          "GPS_Height_m," \
+         "GPS_Time," \
          "Supply_Voltage," \
          "Battery_V\n"
 
@@ -131,7 +132,6 @@ global clearplot  # 1 clear plots, 0 not
 
 TEMP_FILE_WIND = os.path.join(LOCAL_DATA_PATH, "tempwind.csv")
 TEMP_FILE_V = os.path.join(LOCAL_DATA_PATH, "tempv.csv")
-
 
 # Step 1: Create a worker class
 class Worker(QObject):
@@ -267,16 +267,23 @@ class Worker(QObject):
                 x = wind.readline().decode()
                 # print(x)
                 y = x.split(',')
-                wind_dir = y[3]  # Corrected_Direction
-                wind_speed = y[4]  # Corrected_Speed
-
-                z = y[9].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
+                # occasionally I2C board sents out empty strings, this serves as a validation.
+                a1 = int(y[1])  # Direction
+                a2 = float(y[2])  # Speed
+                wind_dir = int(y[3])  # Corrected_Direction
+                wind_speed = float(y[4])  # Corrected_Speed
+                a3 = float(y[5])  # Pressure
+                a4 = float(y[6])  # Humidity
+                a5 = float(y[7])  # Temperature
+                a6 = float(y[8])  # Dew point
+                a7, a8, a9 = y[9].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
+                a11 = float(y[11])  # supply voltage
 
                 with open(local_file_path, "a") as f:
                     # need a space before clock time so excel reads it as string
-                    f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
-                            (epoch, clock_time, y[1], y[2], wind_speed, wind_dir,
-                             y[5], y[6], y[7], y[8], z[0], z[1], z[2], y[11], v))
+                    f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
+                            (epoch, clock_time, a1, a2, wind_dir, wind_speed,
+                             a3, a4, a5, a6, a7, a8, a9, y[10], a11, v))
 
                 # data for wind rose plot
                 plot_data_wind.append([wind_dir, wind_speed])
@@ -760,12 +767,15 @@ class Window(QWidget):
         xmak = [time.strftime('%H:%M', time.localtime(epoch_time[0]))]
         for i in range(1, len(epoch_time)):
             t = epoch_time[i]
-            clock0 = time.strftime('%M:%S', time.localtime(epoch_time[i-1]))
-            clock =  time.strftime('%M:%S', time.localtime(t))
-            if (clock0[:2] == '29' and clock[:2]=='30') or (clock0[:2] == '59' and clock[:2]=='00'):
+            clock0 = time.strftime('%H:%M', time.localtime(epoch_time[i-1]))
+            clock =  time.strftime('%H:%M', time.localtime(t))
+            # print(clock0, clock)
+            if (clock0[:2] != clock[:2]) or (int(clock0[-2:]) <= 29 and int(clock[-2:]) >= 30):
                 xx.append(int(t))
                 xmak.append(time.strftime('%H:%M', time.localtime(t)))       
                 
+        # print("xx: ", xx)
+        # print("xmak: ", xmak)
         ax1.set_xticks(xx)
         ax1.set_xticklabels(xmak, fontsize=8)
 
@@ -790,7 +800,10 @@ class Window(QWidget):
                 # check if battery is dead
                 if v1 < VOLTAGE_MIN:
                     b = 0
-                    print("! Warning, battery is dead: ", time.ctime())
+                    x = "! Warning, battery is dead: ", time.ctime()
+                    with open(self.warning_msg, 'r') as f:
+                        f.write(x)
+                    print(x)
                 
                     if b != self.battery_state:
                         self.batteryLabel.setText("Battery is dead!")
@@ -873,6 +886,10 @@ class Window(QWidget):
             else:
                 self.hintLabel.setText("! Folder to store data does not exist.")
                 tag = 0
+                
+            self.warning_msg = os.path.join(self.rdrive_folder, "battery_warning.txt")
+            if os.path.isfile(self.warning_msg):
+                os.remove(self.warning_msg)
 
         if tag:
             try:
