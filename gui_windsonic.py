@@ -1,4 +1,6 @@
-# wind anemometer model "WindSonic M" data recorder control code, 2024.7.25
+# Wind anemometer model "WindSonic M" data recorder control code.
+# with graphic user interface. last updated: 2024.7.25
+
 # default setting parameters  #####
 # anemometer
 BAUDRATE = 19200

@@ -1,3 +1,6 @@
+# Wind anemometer model "GMX500" data recorder control code.
+# run in terminal, ssh. last updated: 2024.10.31
+
 import time
 import os
 import shutil
@@ -17,11 +20,13 @@ from adafruit_ina219 import INA219
 # custom parameters
 PORT = '/dev/ttyUSB0'
 BAUDRATE = 19200
-VOLTAGE_MIN = 0.884  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 12  # battery is 12 V, lower than this means battery is dead.
 
-# csv header: 15 items
+# csv header: 18 items
 HEADER = "epoch_time," \
          "local_clock_time," \
+         "velocity_u_m/s," \
+         "velocity_v_m/s," \
          "Direction," \
          "Speed_m/s," \
          "Corrected_Direction," \
@@ -33,6 +38,7 @@ HEADER = "epoch_time," \
          "GPS_Latitude," \
          "GPS_longitude," \
          "GPS_Height_m," \
+         "GPS_Time," \
          "Supply_Voltage," \
          "Battery_V\n"
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
@@ -62,16 +68,31 @@ nbc = NonBlockingConsole()
 
 def record(x, v, local_file_path):
     y = x.split(',')
-    z = y[9].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
 
     epoch = time.time()
     clock_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # occasionally I2C board sents out empty strings, this serves as a validation.
+    a1 = float(y[1])  # u-velocity
+    a2 = float(y[2])  # v-velocity
+    a3 = int(y[3])  # Direction
+    a4 = float(y[4])  # Speed
+    wind_dir = int(y[5])  # Corrected_Direction
+    wind_speed = float(y[6])  # Corrected_Speed
+    a5 = float(y[7])  # Pressure
+    a6 = float(y[8])  # Humidity
+    a7 = float(y[9])  # Temperature
+    a8 = float(y[10])  # Dew point
+    a9, a10, a11 = y[11].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
+    a13 = float(y[13])  # supply voltage
 
     with open(local_file_path, "a") as f:
         # need a space before clock time so excel reads it as string
-        f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
-                (epoch, clock_time, y[1], y[2], y[3], y[4],
-                y[5], y[6], y[7], y[8], z[0], z[1], z[2], y[11], v))
+        f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
+                (epoch, clock_time, a1, a2, a3, 
+                 a4, wind_dir, wind_speed, a5, a6, 
+                 a7, a8, a9, a10, a11, 
+                 y[12], a13, v))
 
 
 def run_wind():
@@ -152,7 +173,7 @@ def run_wind():
             x = "! Warning, battery is dead: %s" % time.ctime()
             try:
                 with open(WARNING_MSG, 'a') as f:
-                    f.write(x)
+                    f.write(x + "\n")
             except:
                 pass
             print(x)
@@ -196,3 +217,9 @@ if __name__ == "__main__":
     
     if tag:
         run_wind()
+
+
+# @author: Yilin Shi | 2024.10.31
+# shiyilin890@gmail.com
+# Bog the Fat Crocodile vvvvvvv
+#                       ^^^^^^^

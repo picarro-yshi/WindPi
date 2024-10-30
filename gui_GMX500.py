@@ -1,11 +1,12 @@
-# wind anemometer model "GMX500" data recorder control code, 2024.10.9
+# Wind anemometer model "GMX500" data recorder control code.
+# with graphic user interface. last updated: 2024.10.31
 
 ### custom parameters  ###
 # anemometer
 BAUDRATE = 19200
 
 # I2C board
-VOLTAGE_MIN = 0.884  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 12  # battery is 12 V, lower than this means battery is dead.
 
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
@@ -15,9 +16,11 @@ PLOT_WINDOW_V = 6  # hour, time length for battery data plot
 INTERVAL_V = 5  # min, plot a battery voltage point every # mins
 MONTH = 3  # delete files that is how many months old
 
-# csv header: 15 items
+# csv header: 18 items
 HEADER = "epoch_time," \
          "local_clock_time," \
+         "velocity_u_m/s," \
+         "velocity_v_m/s," \
          "Direction," \
          "Speed_m/s," \
          "Corrected_Direction," \
@@ -268,22 +271,26 @@ class Worker(QObject):
                 # print(x)
                 y = x.split(',')
                 # occasionally I2C board sents out empty strings, this serves as a validation.
-                a1 = int(y[1])  # Direction
-                a2 = float(y[2])  # Speed
-                wind_dir = int(y[3])  # Corrected_Direction
-                wind_speed = float(y[4])  # Corrected_Speed
-                a3 = float(y[5])  # Pressure
-                a4 = float(y[6])  # Humidity
-                a5 = float(y[7])  # Temperature
-                a6 = float(y[8])  # Dew point
-                a7, a8, a9 = y[9].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
-                a11 = float(y[11])  # supply voltage
+                a1 = float(y[1])  # u-velocity
+                a2 = float(y[2])  # v-velocity
+                a3 = int(y[3])  # Direction
+                a4 = float(y[4])  # Speed
+                wind_dir = int(y[5])  # Corrected_Direction
+                wind_speed = float(y[6])  # Corrected_Speed
+                a5 = float(y[7])  # Pressure
+                a6 = float(y[8])  # Humidity
+                a7 = float(y[9])  # Temperature
+                a8 = float(y[10])  # Dew point
+                a9, a10, a11 = y[11].split(':')  # GPS_Latitude, GPS_longitude, GPS_Height
+                a13 = float(y[13])  # supply voltage
 
                 with open(local_file_path, "a") as f:
                     # need a space before clock time so excel reads it as string
-                    f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
-                            (epoch, clock_time, a1, a2, wind_dir, wind_speed,
-                             a3, a4, a5, a6, a7, a8, a9, y[10], a11, v))
+                    f.write("%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" %
+                            (epoch, clock_time, a1, a2, a3, 
+                             a4, wind_dir, wind_speed, a5, a6, 
+                             a7, a8, a9, a10, a11, 
+                             y[12], a13, v))
 
                 # data for wind rose plot
                 plot_data_wind.append([wind_dir, wind_speed])
@@ -723,8 +730,11 @@ class Window(QWidget):
         epoch1 = int(time.mktime(time.strptime(folders[0], "%Y%m%d")))
         epoch_now = int(time.time())
         if (epoch_now - epoch1) > 2628000 * MONTH:  # seconds
+            print("! There are files older than %s months in the folder, will delete them" % (MONTH))
+            
+            '''
+            # message box not working on Pi, will hang
             note = "! There are wind data older than %s months\nin the folder '%s'.\nPress Ok to delete these files and save disk space.\nPress Cancel to keep them (not recommended)." % (MONTH, LOCAL_DATA_PATH)
-
             reply = QMessageBox.question(
                 self,
                 "Warning",
@@ -734,6 +744,8 @@ class Window(QWidget):
                 )
 
             if reply == QMessageBox.StandardButton.Ok:
+            '''
+            if 1:
                 for name in folders:
                     epoch1 = int(time.mktime(time.strptime(name, "%Y%m%d")))
                     if (epoch_now - epoch1) > 2628000 * MONTH:
@@ -743,7 +755,7 @@ class Window(QWidget):
                         break
             else:
                 print("keep files.")
-                
+            
                 
     # battery voltage time series plot
     def plot_v(self, epoch_time, v):
@@ -803,7 +815,7 @@ class Window(QWidget):
                     x = "! Warning, battery is dead: %s" % time.ctime()
                     try:
                         with open(self.warning_msg, 'a') as f:
-                            f.write(x)
+                            f.write(x + "\n")
                     except:
                         pass
                     print(x)
@@ -991,7 +1003,7 @@ if __name__ == "__main__":
 
 
 
-# @author: Yilin Shi | 2024.10.10
+# @author: Yilin Shi | 2024.10.31
 # shiyilin890@gmail.com
 # Bog the Fat Crocodile vvvvvvv
 #                       ^^^^^^^
