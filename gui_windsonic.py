@@ -10,7 +10,7 @@ DATA_RATE = 4  # Hz, data output rate
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
 GUI_REFRESH_TIME = 1  # s
 PLOT_WINDOW = 5  # min, time length for GUI data display
-MONTH = 3  # delete files that is how many months old
+MONTH = 6  # delete files that is how many months old
 HEADER = "epoch_time,local_clock_time,U_velocity_NS,V_velocity_WE,speed,direction\n"  # csv header
 
 import sys

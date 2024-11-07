@@ -20,7 +20,7 @@ from adafruit_ina219 import INA219
 # custom parameters
 PORT = '/dev/ttyUSB0'
 BAUDRATE = 19200
-VOLTAGE_MIN = 12  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 12.2  # battery is 12 V, lower than this means battery is dead.
 
 # csv header: 18 items
 HEADER = "epoch_time," \

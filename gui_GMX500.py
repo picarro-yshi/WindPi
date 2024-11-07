@@ -6,7 +6,7 @@
 BAUDRATE = 19200
 
 # I2C board
-VOLTAGE_MIN = 12  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 12.2  # battery is 12 V, lower than this means battery is dead.
 
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
@@ -14,7 +14,7 @@ GUI_REFRESH_TIME = 1  # s
 PLOT_WINDOW_WIND = 10  # min, time length for wind data plot
 PLOT_WINDOW_V = 6  # hour, time length for battery data plot
 INTERVAL_V = 5  # min, plot a battery voltage point every # mins
-MONTH = 3  # delete files that is how many months old
+MONTH = 6  # delete files that is how many months old
 
 # csv header: 18 items
 HEADER = "epoch_time," \
