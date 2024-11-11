@@ -782,7 +782,8 @@ class Window(QWidget):
             clock0 = time.strftime('%H:%M', time.localtime(epoch_time[i-1]))
             clock =  time.strftime('%H:%M', time.localtime(t))
             # print(clock0, clock)
-            if (clock0[:2] != clock[:2]) or (int(clock0[-2:]) <= 29 and int(clock[-2:]) >= 30):
+            #if (clock0[:2] != clock[:2]) or (int(clock0[-2:]) <= 29 and int(clock[-2:]) >= 30):
+            if (clock0[:2] != clock[:2]):
                 xx.append(int(t))
                 xmak.append(time.strftime('%H:%M', time.localtime(t)))       
                 
