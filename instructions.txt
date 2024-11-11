@@ -1,0 +1,66 @@
+
+*** Mount all drive
+$ cd Downloads/
+(First time only: 
+$ chmod u+x mountSharedDrive-mod.sh
+If the script was copied to the system, it does need to be made executable & run as sudo.)
+$ sudo ./mountSharedDrive-mod.sh
+On raspberry pi:
+$ sudo bash mountSharedDrive-mod.sh
+
+(if this cannot mount, try to unmount first, then mount)
+
+*** start the GUI
+$ cd /home/picarro/Documents/2024.6.25raspi
+$ source venv/bin/activate
+$ cd WindPi
+$ python wind_gui.py
+
+
+*** USB port permission error:  [Errno 13] Permission denied: '/dev/ttyUSB0'
+$ sudo chmod 666 /dev/ttyUSB0
+
+
+Meld in replace of Diffmerge
+https://meldmerge.org/
+sudo apt --fix-broken install
+sudo apt install meld
+
+
+*** build the code, for first time use
+(step1: get the code)
+create this folder: /home/picarro/Documents/2024.6.25raspi
+$ git clone https://github.com/picarro-yshi/WindPi.git
+$ git checkout main
+$ git pull
+
+(step2: create virtual environment and install libraries)
+$ sudo apt install python3-virtualenv
+$ python3 -m virtualenv venv
+!!! on Mac:
+$ cd venv/Scripts
+$ activate
+!!! on Linux: 
+source venv/bin/activate
+(venv) $ python -m pip install -r requirements.txt
+
+
+
+*** install Pi with microSD card (1TB ok)
+https://www.raspberrypi.com/documentation/computers/getting-started.html#configuration-on-first-boot
+
+Step 1: buy Pi and microSD card
+Step 2: Write operation system of the Pi on the microSD card, 
+on another PC, download the Raspberry Pi Imager:
+https://www.raspberrypi.com/software/
+insert the microSD card to this PC, and run the Imager program
+Step 3: insert the microSD card to the Pi, power on the Pi
+
+
+
+*** wifi
+raspi-srv
+HEBr7z0n
+
+
+

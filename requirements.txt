@@ -1,0 +1,6 @@
+PySide6
+pyserial
+numpy
+adafruit-circuitpython-ina219
+matplotlib
+windrose

@@ -136,6 +136,14 @@ global clearplot  # 1 clear plots, 0 not
 TEMP_FILE_WIND = os.path.join(LOCAL_DATA_PATH, "tempwind.csv")
 TEMP_FILE_V = os.path.join(LOCAL_DATA_PATH, "tempv.csv")
 
+# create folder for local data storage
+folder_data = '/home/picarro/Wind_data'
+if not os.path.isdir(folder_data):
+    os.mkdir(folder_data)
+if not os.listdir(folder_data):  #  empty
+    today = time.strftime('%Y%m%d')
+    os.mkdir(os.path.join(folder_data, today))
+
 # Step 1: Create a worker class
 class Worker(QObject):
     finished = Signal()
