@@ -14,7 +14,12 @@ $ sudo bash mountSharedDrive-mod.sh
 $ cd /home/picarro/Documents/2024.6.25raspi
 $ source venv/bin/activate
 $ cd WindPi
-$ python wind_gui.py
+$ python gui_GMX500.py
+
+3 scripts:
+- gui_GMX500.py		new model with GUI
+- GMX500.py		new model no GUI, for terminal and ssh
+- gui_windsonic.py	old model with GUI
 
 
 *** USB port permission error:  [Errno 13] Permission denied: '/dev/ttyUSB0'

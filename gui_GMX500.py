@@ -6,7 +6,7 @@
 BAUDRATE = 19200
 
 # I2C board
-VOLTAGE_MIN = 12.2  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 12.1  # battery is 12 V, lower than this means battery is dead.
 
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
@@ -768,6 +768,10 @@ class Window(QWidget):
     # battery voltage time series plot
     def plot_v(self, epoch_time, v):
         self.figure1.clear()
+        # [left, bottom, width, height]
+        ax1 = self.figure1.add_axes([0.12, 0.1, 0.85, 0.85])
+
+        '''
         ax1 = self.figure1.add_subplot(111)
         box = ax1.get_position()
         box.x0 = box.x0 + 0.04
@@ -775,6 +779,8 @@ class Window(QWidget):
         box.y0 = box.y0 - 0.01
         box.y1 = box.y1 + 0.05
         ax1.set_position(box)
+        '''
+        
         ax1.plot(epoch_time, v, marker = ".", color = "black", linewidth = 0.7)
         ax1.grid(alpha = 0.3)
 
@@ -784,7 +790,7 @@ class Window(QWidget):
 
         # add mark for every half hour
         xx = [epoch_time[0]]
-        xmak = [time.strftime('%H:%M', time.localtime(epoch_time[0]))]
+        xmak = [time.strftime('%H', time.localtime(epoch_time[0]))]  # '%H:%M'
         for i in range(1, len(epoch_time)):
             t = epoch_time[i]
             clock0 = time.strftime('%H:%M', time.localtime(epoch_time[i-1]))
@@ -793,7 +799,7 @@ class Window(QWidget):
             #if (clock0[:2] != clock[:2]) or (int(clock0[-2:]) <= 29 and int(clock[-2:]) >= 30):
             if (clock0[:2] != clock[:2]):
                 xx.append(int(t))
-                xmak.append(time.strftime('%H:%M', time.localtime(t)))       
+                xmak.append(time.strftime('%H', time.localtime(t)))  # '%H:%M'
                 
         # print("xx: ", xx)
         # print("xmak: ", xmak)
