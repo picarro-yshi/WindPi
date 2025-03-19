@@ -6,7 +6,7 @@
 BAUDRATE = 19200
 
 # I2C board
-VOLTAGE_MIN = 12.1  # battery is 12 V, lower than this means battery is dead.
+VOLTAGE_MIN = 12  # battery is 12 V, lower than this means battery is dead.
 
 # GUI
 LOCAL_DATA_PATH = "/home/picarro/Wind_data"  # folder to save data locally
@@ -827,7 +827,7 @@ class Window(QWidget):
                 # check if battery is dead
                 if v1 < VOLTAGE_MIN:
                     b = 0
-                    x = "! Warning, battery is dead: %s" % time.ctime()
+                    x = "! Warning, battery dead: %s V, %s" % (v1, time.ctime())
                     try:
                         with open(self.warning_msg, 'a') as f:
                             f.write(x + "\n")
@@ -990,6 +990,8 @@ class Window(QWidget):
 
     def port_detect(self):
         port = self.portComboBox.currentText()
+        print(port, BAUDRATE)
+        
         wind = serial.Serial(port, BAUDRATE, timeout = 5)
         x = wind.readline().decode()
         if x:
